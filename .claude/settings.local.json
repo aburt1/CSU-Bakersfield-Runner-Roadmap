@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm install three @react-three/fiber @react-three/drei)",
+      "Bash(npm install three@^0.160.0 @react-three/fiber@^8.15.0 @react-three/drei@^9.88.0)"
+    ]
+  }
+}

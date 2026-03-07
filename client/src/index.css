@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======================================
+   CSUB Admissions 3D Road Map - Global Styles
+   ====================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #87CEEB;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ======================================
+   3D Sign Cards (rendered via drei Html)
+   ====================================== */
+
+.sign-card-3d {
+  background: linear-gradient(135deg, #003594 0%, #0047B3 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 160px;
+  max-width: 180px;
+  border: 3px solid #003594;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: 'Fredoka', sans-serif;
+  user-select: none;
+}
+
+.sign-card-3d:hover {
+  transform: scale(1.06);
+  box-shadow: 0 8px 28px rgba(0, 53, 148, 0.4);
+}
+
+.sign-card-3d.completed {
+  border-color: #FFC72C;
+  box-shadow: 0 4px 20px rgba(255, 199, 44, 0.4);
+  background: linear-gradient(135deg, #003594 0%, #1a4faa 100%);
+}
+
+/* ======================================
+   Step Number Badge
+   ====================================== */
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #FFC72C;
+  color: #003594;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  font-family: 'Fredoka', sans-serif;
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  border: 2px solid white;
+}
+
+/* ======================================
+   Gradient text helper
+   ====================================== */
+
+.text-gradient {
+  background: linear-gradient(135deg, #003594, #FFC72C);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ======================================
+   Custom scrollbar
+   ====================================== */
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #87CEEB;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #003594, #0047B3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #002266;
+}
