@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
 // GET /api/steps/progress - Get current student's progress + tags
 router.get('/progress', authMiddleware, (req, res) => {
   const progress = req.db.prepare(`
-    SELECT sp.step_id, sp.completed_at
+    SELECT sp.step_id, sp.completed_at, sp.status
     FROM student_progress sp
     WHERE sp.student_id = ?
   `).all(req.studentId);

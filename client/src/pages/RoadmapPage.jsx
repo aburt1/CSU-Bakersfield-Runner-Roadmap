@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../auth/AuthProvider';
 import { useProgress } from '../hooks/useProgress';
 import ProgressSummary from '../components/roadmap/ProgressSummary';
 import CurrentStepCallout from '../components/roadmap/CurrentStepCallout';
 import RoadmapTimeline from '../components/roadmap/RoadmapTimeline';
+import ListView from '../components/roadmap/ListView';
 import StepDetailPanel from '../components/roadmap/StepDetailPanel';
 import HelpSection from '../components/roadmap/HelpSection';
 import CompletionBanner from '../components/roadmap/CompletionBanner';
@@ -28,6 +29,8 @@ export default function RoadmapPage() {
   const [selectedStep, setSelectedStep] = useState(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationShown, setCelebrationShown] = useState(false);
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'list'
+  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
 
   // Show celebration once when all complete
   useEffect(() => {
@@ -37,10 +40,14 @@ export default function RoadmapPage() {
     }
   }, [allComplete, celebrationShown]);
 
-  // Scroll to top when step detail closes
   const mainRef = useRef(null);
-
   const firstName = user?.displayName?.split(' ')[0] || 'Student';
+
+  // Filter steps
+  const filteredSteps = useMemo(() => {
+    if (!showOnlyIncomplete) return steps;
+    return steps.filter((s) => s.status !== 'completed' && s.status !== 'waived');
+  }, [steps, showOnlyIncomplete]);
 
   // Loading state
   if (loading) {
@@ -157,12 +164,87 @@ export default function RoadmapPage() {
           />
         )}
 
-        {/* ===== D. Roadmap Timeline ===== */}
-        <RoadmapTimeline
-          steps={steps}
-          completedDates={completedDates}
-          onSelectStep={setSelectedStep}
-        />
+        {/* ===== View Controls ===== */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wider">
+              Your Roadmap
+            </h2>
+            <div className="flex-1 h-px bg-gray-200 hidden sm:block" style={{ minWidth: '2rem' }} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Filter */}
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showOnlyIncomplete}
+                onChange={(e) => setShowOnlyIncomplete(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-csub-blue focus:ring-csub-blue"
+              />
+              <span className="font-body text-xs text-csub-gray">Incomplete only</span>
+            </label>
+
+            {/* View toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('timeline')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'timeline' ? 'bg-white shadow-sm text-csub-blue' : 'text-gray-400 hover:text-gray-600'
+                }`}
+                aria-label="Timeline view"
+                title="Timeline view"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  <circle cx="4" cy="6" r="1" fill="currentColor" />
+                  <circle cx="4" cy="12" r="1" fill="currentColor" />
+                  <circle cx="4" cy="18" r="1" fill="currentColor" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'list' ? 'bg-white shadow-sm text-csub-blue' : 'text-gray-400 hover:text-gray-600'
+                }`}
+                aria-label="List view"
+                title="List view"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== D. Roadmap View ===== */}
+        {viewMode === 'timeline' ? (
+          <RoadmapTimeline
+            steps={filteredSteps}
+            completedDates={completedDates}
+            onSelectStep={setSelectedStep}
+          />
+        ) : (
+          <ListView
+            steps={filteredSteps}
+            completedDates={completedDates}
+            onSelectStep={setSelectedStep}
+          />
+        )}
+
+        {/* Filtered empty state */}
+        {showOnlyIncomplete && filteredSteps.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-4xl mb-3">🎉</div>
+            <p className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
+              All caught up!
+            </p>
+            <p className="font-body text-sm text-csub-gray mt-1">
+              No incomplete steps remaining.
+            </p>
+          </div>
+        )}
 
         {/* ===== E. Help Section ===== */}
         <HelpSection />
@@ -173,17 +255,17 @@ export default function RoadmapPage() {
         {selectedStep && (
           <StepDetailPanel
             step={selectedStep}
-            stepNumber={steps.findIndex((s) => s.id === selectedStep.id) + 1}
-            totalSteps={totalSteps}
+            stepNumber={filteredSteps.findIndex((s) => s.id === selectedStep.id) + 1}
+            totalSteps={filteredSteps.length}
             completedAt={completedDates[selectedStep.id]}
             onClose={() => setSelectedStep(null)}
             onNavigate={(direction) => {
-              const idx = steps.findIndex((s) => s.id === selectedStep.id);
-              const next = direction === 'next' ? steps[idx + 1] : steps[idx - 1];
+              const idx = filteredSteps.findIndex((s) => s.id === selectedStep.id);
+              const next = direction === 'next' ? filteredSteps[idx + 1] : filteredSteps[idx - 1];
               if (next) setSelectedStep(next);
             }}
-            hasPrev={steps.findIndex((s) => s.id === selectedStep.id) > 0}
-            hasNext={steps.findIndex((s) => s.id === selectedStep.id) < steps.length - 1}
+            hasPrev={filteredSteps.findIndex((s) => s.id === selectedStep.id) > 0}
+            hasNext={filteredSteps.findIndex((s) => s.id === selectedStep.id) < filteredSteps.length - 1}
           />
         )}
       </AnimatePresence>

@@ -63,6 +63,9 @@ export function initDatabase() {
     'ALTER TABLE steps ADD COLUMN required_tags TEXT',
     'ALTER TABLE steps ADD COLUMN is_active INTEGER DEFAULT 1',
     'ALTER TABLE students ADD COLUMN tags TEXT',
+    "ALTER TABLE student_progress ADD COLUMN status TEXT DEFAULT 'completed'",
+    'ALTER TABLE student_progress ADD COLUMN note TEXT',
+    'ALTER TABLE steps ADD COLUMN contact_info TEXT',
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }

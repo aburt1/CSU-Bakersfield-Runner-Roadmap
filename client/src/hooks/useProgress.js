@@ -15,24 +15,22 @@ function stepApplies(step, studentTags) {
 }
 
 /**
- * Derive rich status for each step:
- * - completed: student finished it
- * - waived: admin waived it (future: separate flag)
- * - in_progress: the current active step (first non-completed step)
- * - locked: step is after the current step and has implicit prerequisite
- * - not_started: step is available but not the current focus
+ * Derive rich status for each step based on progress data from server.
+ * progressMap: Map<stepId, { status: 'completed'|'waived', completed_at }>
  *
- * For now, we treat steps as sequential: everything before the first incomplete
- * is completed, the first incomplete is in_progress, and the rest are not_started
- * (not locked, since students can browse ahead).
+ * Statuses:
+ * - completed: student finished it
+ * - waived: admin waived it
+ * - in_progress: the current active step (first step not completed/waived)
+ * - not_started: upcoming steps after the current one
  */
-function deriveStepStatuses(steps, completedSet) {
+function deriveStepStatuses(steps, progressMap) {
   let foundCurrent = false;
-  return steps.map((step, index) => {
-    const isCompleted = completedSet.has(step.id);
+  return steps.map((step) => {
+    const progress = progressMap.get(step.id);
 
-    if (isCompleted) {
-      return { ...step, status: 'completed' };
+    if (progress) {
+      return { ...step, status: progress.status || 'completed' };
     }
 
     if (!foundCurrent) {
@@ -47,7 +45,7 @@ function deriveStepStatuses(steps, completedSet) {
 export function useProgress() {
   const { token, isAuthenticated } = useAuth();
   const [steps, setSteps] = useState([]);
-  const [completedSteps, setCompletedSteps] = useState(new Set());
+  const [progressMap, setProgressMap] = useState(new Map());
   const [completedDates, setCompletedDates] = useState({});
   const [studentTags, setStudentTags] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +80,11 @@ export function useProgress() {
       });
       if (res.ok) {
         const data = await res.json();
-        setCompletedSteps(new Set(data.progress.map((p) => p.step_id)));
+        const map = new Map();
+        for (const p of data.progress) {
+          map.set(p.step_id, { status: p.status || 'completed', completed_at: p.completed_at });
+        }
+        setProgressMap(map);
         setCompletedDates(
           Object.fromEntries(data.progress.map((p) => [p.step_id, p.completed_at]))
         );
@@ -118,24 +120,23 @@ export function useProgress() {
   // Filter steps based on student tags and derive statuses
   const enrichedSteps = useMemo(() => {
     const applicable = steps.filter((step) => stepApplies(step, studentTags));
-    return deriveStepStatuses(applicable, completedSteps);
-  }, [steps, studentTags, completedSteps]);
+    return deriveStepStatuses(applicable, progressMap);
+  }, [steps, studentTags, progressMap]);
 
   const totalSteps = enrichedSteps.length;
-  const completedCount = enrichedSteps.filter((s) => s.status === 'completed').length;
-  const percentage = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
+  const doneCount = enrichedSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
+  const percentage = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
   const currentStep = enrichedSteps.find((s) => s.status === 'in_progress') || null;
-  const allComplete = totalSteps > 0 && completedCount === totalSteps;
+  const allComplete = totalSteps > 0 && doneCount === totalSteps;
 
   return {
     steps: enrichedSteps,
-    completedSteps,
     completedDates,
     studentTags,
     loading,
     error,
     totalSteps,
-    completedCount,
+    completedCount: doneCount,
     percentage,
     currentStep,
     allComplete,

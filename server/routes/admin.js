@@ -25,7 +25,7 @@ router.get('/steps', (req, res) => {
 
 // POST /api/admin/steps — create a new step
 router.post('/steps', (req, res) => {
-  const { title, description, icon, sort_order, deadline, guide_content, links, required_tags } = req.body;
+  const { title, description, icon, sort_order, deadline, guide_content, links, required_tags, contact_info } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
@@ -35,8 +35,8 @@ router.post('/steps', (req, res) => {
   const order = sort_order ?? (maxOrder.max || 0) + 1;
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, guide_content, links, required_tags, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, guide_content, links, required_tags, contact_info, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     title,
     description || null,
@@ -45,7 +45,8 @@ router.post('/steps', (req, res) => {
     deadline || null,
     guide_content || null,
     links ? JSON.stringify(links) : null,
-    required_tags ? JSON.stringify(required_tags) : null
+    required_tags ? JSON.stringify(required_tags) : null,
+    contact_info ? JSON.stringify(contact_info) : null
   );
 
   logAudit(req.db, {
@@ -66,7 +67,7 @@ router.put('/steps/:id', (req, res) => {
     return res.status(404).json({ error: 'Step not found' });
   }
 
-  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'guide_content', 'links', 'required_tags', 'is_active'];
+  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'guide_content', 'links', 'required_tags', 'contact_info', 'is_active'];
   const updates = [];
   const values = [];
 
@@ -74,7 +75,7 @@ router.put('/steps/:id', (req, res) => {
     if (req.body[field] !== undefined) {
       updates.push(`${field} = ?`);
       const val = req.body[field];
-      if (field === 'links' || field === 'required_tags') {
+      if (field === 'links' || field === 'required_tags' || field === 'contact_info') {
         values.push(val ? JSON.stringify(val) : null);
       } else {
         values.push(val);
@@ -148,8 +149,8 @@ router.post('/steps/:id/duplicate', (req, res) => {
   const newOrder = (maxOrder.max || 0) + 1;
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, guide_content, links, required_tags, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, guide_content, links, required_tags, contact_info, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     step.title + ' (Copy)',
     step.description,
@@ -158,7 +159,8 @@ router.post('/steps/:id/duplicate', (req, res) => {
     step.deadline,
     step.guide_content,
     step.links,
-    step.required_tags
+    step.required_tags,
+    step.contact_info
   );
 
   logAudit(req.db, {
@@ -202,7 +204,8 @@ router.put('/steps/bulk-status', (req, res) => {
 router.post('/students/:studentId/steps/:stepId/complete', (req, res) => {
   const { studentId, stepId } = req.params;
   const step = parseInt(stepId, 10);
-  const { note } = req.body || {};
+  const { note, status } = req.body || {};
+  const progressStatus = status === 'waived' ? 'waived' : 'completed';
 
   const student = req.db.prepare('SELECT id, display_name FROM students WHERE id = ?').get(studentId);
   if (!student) {
@@ -215,18 +218,18 @@ router.post('/students/:studentId/steps/:stepId/complete', (req, res) => {
   }
 
   req.db.prepare(`
-    INSERT OR IGNORE INTO student_progress (student_id, step_id)
-    VALUES (?, ?)
-  `).run(studentId, step);
+    INSERT OR REPLACE INTO student_progress (student_id, step_id, status, note)
+    VALUES (?, ?, ?, ?)
+  `).run(studentId, step, progressStatus, note || null);
 
   logAudit(req.db, {
     entityType: 'student_progress',
     entityId: studentId,
-    action: 'complete',
+    action: progressStatus === 'waived' ? 'waive' : 'complete',
     details: { stepId: step, stepTitle: stepRow.title, studentName: student.display_name, note: note || null },
   });
 
-  res.json({ success: true, studentId, stepId: step, completedAt: new Date().toISOString() });
+  res.json({ success: true, studentId, stepId: step, status: progressStatus, completedAt: new Date().toISOString() });
 });
 
 // DELETE /api/admin/students/:studentId/steps/:stepId/complete
@@ -263,7 +266,7 @@ router.get('/students/:studentId/progress', (req, res) => {
   }
 
   const progress = req.db.prepare(`
-    SELECT sp.step_id, sp.completed_at, s.title
+    SELECT sp.step_id, sp.completed_at, sp.status, sp.note, s.title
     FROM student_progress sp
     JOIN steps s ON s.id = sp.step_id
     WHERE sp.student_id = ?

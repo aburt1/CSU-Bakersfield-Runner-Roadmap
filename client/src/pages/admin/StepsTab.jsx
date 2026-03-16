@@ -104,13 +104,19 @@ export default function StepsTab({ api }) {
 
   const sortedSteps = [...steps].sort((a, b) => a.sort_order - b.sort_order);
   const visibleSteps = showInactive ? sortedSteps : sortedSteps.filter((s) => s.is_active !== 0);
+  const activeCount = steps.filter((s) => s.is_active !== 0).length;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
-          Manage Steps
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
+            Manage Steps
+          </h2>
+          <span className="font-body text-xs text-csub-gray bg-gray-100 rounded-full px-2.5 py-0.5">
+            {activeCount} active
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 font-body text-xs text-csub-gray cursor-pointer">
             <input
@@ -123,16 +129,19 @@ export default function StepsTab({ api }) {
           </label>
           <button
             onClick={() => setEditingStep({})}
-            className="bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors text-sm"
+            className="flex items-center gap-1.5 bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors text-sm"
           >
-            + New Step
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Step
           </button>
         </div>
       </div>
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 bg-csub-blue/5 border border-csub-blue/20 rounded-lg px-4 py-2.5">
+        <div className="flex items-center gap-3 mb-4 bg-csub-blue/5 border border-csub-blue/20 rounded-xl px-4 py-2.5">
           <span className="font-body text-sm text-csub-blue-dark font-semibold">
             {selected.size} selected
           </span>
@@ -180,7 +189,7 @@ export default function StepsTab({ api }) {
         {visibleSteps.map((step, i) => (
           <div key={step.id}>
             <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border shadow-sm transition-all hover:shadow-md ${
                 step.is_active === 0
                   ? 'border-gray-200 bg-gray-50 opacity-60'
                   : 'border-gray-200 bg-white'
@@ -198,7 +207,7 @@ export default function StepsTab({ api }) {
                 <button
                   onClick={() => moveStep(i, -1)}
                   disabled={i === 0}
-                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30"
+                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
                   title="Move up"
                 >
                   ▲
@@ -206,20 +215,23 @@ export default function StepsTab({ api }) {
                 <button
                   onClick={() => moveStep(i, 1)}
                   disabled={i === visibleSteps.length - 1}
-                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30"
+                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
                   title="Move down"
                 >
                   ▼
                 </button>
               </div>
 
-              <span className="text-lg w-8 text-center flex-shrink-0">{step.icon || '📋'}</span>
+              {/* Icon in container */}
+              <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
+                {step.icon || '📋'}
+              </div>
 
               <div className="flex-1 min-w-0">
                 <p className="font-body text-sm font-semibold text-csub-blue-dark truncate">{step.title}</p>
                 <p className="font-body text-xs text-csub-gray truncate">
                   {step.description || 'No description'}
-                  {step.deadline && ` — ${step.deadline}`}
+                  {step.deadline && <span className="text-amber-600 ml-1">— {step.deadline}</span>}
                 </p>
                 {step.required_tags && (
                   <div className="flex flex-wrap gap-1 mt-1">
@@ -232,30 +244,30 @@ export default function StepsTab({ api }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => setEditingStep(step)}
-                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark transition-colors"
+                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDuplicate(step.id)}
-                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark transition-colors"
+                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
                 >
                   Duplicate
                 </button>
                 {step.is_active === 0 ? (
                   <button
                     onClick={() => handleRestore(step.id)}
-                    className="font-body text-xs text-green-600 hover:text-green-800 transition-colors"
+                    className="font-body text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50 transition-colors"
                   >
                     Restore
                   </button>
                 ) : (
                   <button
                     onClick={() => handleDelete(step.id)}
-                    className="font-body text-xs text-red-500 hover:text-red-700 transition-colors"
+                    className="font-body text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
                   >
                     Delete
                   </button>

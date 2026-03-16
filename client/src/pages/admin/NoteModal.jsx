@@ -1,9 +1,14 @@
 import { useState } from 'react';
 
+const ACTION_CONFIG = {
+  complete: { heading: 'Mark Complete', buttonClass: 'bg-csub-blue hover:bg-csub-blue-dark text-white' },
+  waive: { heading: 'Mark as Waived', buttonClass: 'bg-slate-600 hover:bg-slate-700 text-white' },
+  uncomplete: { heading: 'Mark Incomplete', buttonClass: 'bg-red-500 hover:bg-red-600 text-white' },
+};
+
 export default function NoteModal({ stepTitle, stepIcon, action, onConfirm, onCancel }) {
   const [note, setNote] = useState('');
-
-  const isComplete = action === 'complete';
+  const config = ACTION_CONFIG[action] || ACTION_CONFIG.complete;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
@@ -12,12 +17,17 @@ export default function NoteModal({ stepTitle, stepIcon, action, onConfirm, onCa
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-3">
-          {isComplete ? 'Mark Complete' : 'Mark Incomplete'}
+          {config.heading}
         </h3>
         <div className="flex items-center gap-2 mb-4">
           <span className="text-lg">{stepIcon || '📋'}</span>
           <span className="font-body text-sm text-csub-blue-dark font-semibold">{stepTitle}</span>
         </div>
+        {action === 'waive' && (
+          <p className="font-body text-xs text-csub-gray mb-3">
+            Waiving a step means the student does not need to complete it. This is different from marking it complete.
+          </p>
+        )}
         <label className="block font-body text-xs font-semibold text-csub-gray mb-1">
           Note (optional)
         </label>
@@ -25,7 +35,7 @@ export default function NoteModal({ stepTitle, stepIcon, action, onConfirm, onCa
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
-          placeholder="Reason for this change..."
+          placeholder={action === 'waive' ? 'Reason for waiving...' : 'Reason for this change...'}
           className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-1 focus:ring-csub-blue mb-4 resize-none"
         />
         <div className="flex gap-2 justify-end">
@@ -37,11 +47,7 @@ export default function NoteModal({ stepTitle, stepIcon, action, onConfirm, onCa
           </button>
           <button
             onClick={() => onConfirm(note.trim() || null)}
-            className={`font-display font-bold text-sm uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors ${
-              isComplete
-                ? 'bg-csub-blue hover:bg-csub-blue-dark text-white'
-                : 'bg-red-500 hover:bg-red-600 text-white'
-            }`}
+            className={`font-display font-bold text-sm uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors ${config.buttonClass}`}
           >
             Confirm
           </button>

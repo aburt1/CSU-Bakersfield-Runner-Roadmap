@@ -17,6 +17,13 @@ export default function StepForm({ step, onSave, onCancel }) {
   );
   const [sortOrder, setSortOrder] = useState(step?.sort_order ?? '');
 
+  const existingContact = step?.contact_info
+    ? (typeof step.contact_info === 'string' ? JSON.parse(step.contact_info) : step.contact_info)
+    : {};
+  const [contactName, setContactName] = useState(existingContact?.name || '');
+  const [contactEmail, setContactEmail] = useState(existingContact?.email || '');
+  const [contactPhone, setContactPhone] = useState(existingContact?.phone || '');
+
   const handleSubmit = (e) => {
     e.preventDefault();
     let parsedLinks = null;
@@ -29,6 +36,10 @@ export default function StepForm({ step, onSave, onCancel }) {
       }
     }
 
+    const contactInfo = (contactName || contactEmail || contactPhone)
+      ? { name: contactName || null, email: contactEmail || null, phone: contactPhone || null }
+      : null;
+
     onSave({
       title,
       icon: icon || null,
@@ -38,6 +49,7 @@ export default function StepForm({ step, onSave, onCancel }) {
       links: parsedLinks,
       required_tags: requiredTags.length > 0 ? requiredTags : null,
       sort_order: sortOrder !== '' ? parseInt(sortOrder, 10) : undefined,
+      contact_info: contactInfo,
     });
   };
 
@@ -98,6 +110,16 @@ export default function StepForm({ step, onSave, onCancel }) {
       <div>
         <label className={label}>Required Tags (only show to students with these tags)</label>
         <TagEditor tags={requiredTags} onChange={setRequiredTags} />
+      </div>
+
+      {/* Step Contact */}
+      <div>
+        <label className={label}>Step Contact (optional — shown to students for this step)</label>
+        <div className="grid grid-cols-3 gap-3">
+          <input type="text" value={contactName} onChange={(e) => setContactName(e.target.value)} className={field} placeholder="Contact name" />
+          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className={field} placeholder="Email" />
+          <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className={field} placeholder="Phone" />
+        </div>
       </div>
 
       <div className="flex gap-3 pt-2">
