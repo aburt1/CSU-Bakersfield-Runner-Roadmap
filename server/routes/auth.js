@@ -1,26 +1,45 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, signToken } from '../middleware/auth.js';
 
 const router = Router();
 
-// POST /api/auth/guest - Create a guest session
-// This will be replaced with Azure AD login in production
-router.post('/guest', (req, res) => {
-  const studentId = uuidv4();
+// POST /api/auth/dev-login - Dev/POC login (no Azure AD required)
+// Accepts { name, email } and returns a JWT token
+router.post('/dev-login', (req, res) => {
+  const { name, email } = req.body;
 
-  req.db.prepare(`
-    INSERT INTO students (id, display_name)
-    VALUES (?, ?)
-  `).run(studentId, 'Guest Runner');
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Name and email are required' });
+  }
 
-  // In production, this would be a proper JWT signed with Azure AD
-  // For now, the student ID serves as a simple session token
+  // Find existing student by email or create new one
+  let student = req.db.prepare('SELECT id, display_name, email FROM students WHERE email = ?').get(email);
+
+  if (!student) {
+    const studentId = uuidv4();
+    req.db.prepare(`
+      INSERT INTO students (id, display_name, email)
+      VALUES (?, ?, ?)
+    `).run(studentId, name, email);
+
+    // Auto-complete step 1 (Accepted!) for new students
+    req.db.prepare(`
+      INSERT OR IGNORE INTO student_progress (student_id, step_id)
+      VALUES (?, 1)
+    `).run(studentId);
+
+    student = { id: studentId, display_name: name, email };
+  }
+
+  const token = signToken(student.id, student.email);
+
   res.json({
-    token: studentId,
+    token,
     student: {
-      id: studentId,
-      displayName: 'Guest Runner',
+      id: student.id,
+      displayName: student.display_name,
+      email: student.email,
     },
   });
 });
@@ -40,19 +59,6 @@ router.get('/me', authMiddleware, (req, res) => {
     displayName: student.display_name,
     email: student.email,
     createdAt: student.created_at,
-  });
-});
-
-// POST /api/auth/azure - Azure AD login placeholder
-router.post('/azure', (req, res) => {
-  // TODO: Implement Azure AD authentication
-  // 1. Validate the Azure AD token from the request
-  // 2. Extract user info (email, name, oid)
-  // 3. Create or update student record
-  // 4. Return session token
-  res.status(501).json({
-    error: 'Azure AD authentication not yet implemented',
-    message: 'Coming soon! For now, use /api/auth/guest',
   });
 });
 

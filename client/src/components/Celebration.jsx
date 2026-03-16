@@ -2,9 +2,48 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
+/* Inline SVG shield in CSUB blue/gold — resembles the university crest shape */
+function CsubShield() {
+  return (
+    <svg width="80" height="96" viewBox="0 0 80 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Shield body */}
+      <path
+        d="M40 2 L76 16 L76 52 C76 72 60 88 40 94 C20 88 4 72 4 52 L4 16 Z"
+        fill="#003594"
+        stroke="#FFC72C"
+        strokeWidth="3"
+      />
+      {/* Rising sun rays */}
+      <g opacity="0.3">
+        <line x1="40" y1="58" x2="20" y2="38" stroke="#FFC72C" strokeWidth="1.5" />
+        <line x1="40" y1="58" x2="28" y2="32" stroke="#FFC72C" strokeWidth="1.5" />
+        <line x1="40" y1="58" x2="40" y2="28" stroke="#FFC72C" strokeWidth="1.5" />
+        <line x1="40" y1="58" x2="52" y2="32" stroke="#FFC72C" strokeWidth="1.5" />
+        <line x1="40" y1="58" x2="60" y2="38" stroke="#FFC72C" strokeWidth="1.5" />
+      </g>
+      {/* Sun arc */}
+      <path
+        d="M18 62 Q40 42 62 62"
+        fill="#FFC72C"
+        opacity="0.9"
+      />
+      {/* Horizon line */}
+      <line x1="14" y1="62" x2="66" y2="62" stroke="#FFC72C" strokeWidth="2" />
+      {/* Checkmark */}
+      <path
+        d="M28 48 L36 56 L54 34"
+        stroke="#FFC72C"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 export default function Celebration({ onClose }) {
   useEffect(() => {
-    // Fire confetti!
     const duration = 3000;
     const end = Date.now() + duration;
     const csubColors = ['#003594', '#FFC72C', '#ffffff'];
@@ -38,38 +77,52 @@ export default function Celebration({ onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-csub-blue-dark/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0, rotate: -10 }}
-        animate={{ scale: 1, rotate: 0 }}
-        exit={{ scale: 0, rotate: 10 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="bg-white rounded-3xl p-8 md:p-12 max-w-md mx-4 text-center shadow-2xl"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+        className="bg-white rounded-2xl p-8 md:p-12 max-w-md mx-4 text-center shadow-2xl border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-7xl mb-4">🏆</div>
-        <h2 className="font-display text-3xl font-bold text-csub-blue mb-3">
-          You Did It!
+        {/* Shield crest */}
+        <div className="flex justify-center mb-6">
+          <motion.div
+            initial={{ y: -20 }}
+            animate={{ y: 0 }}
+            transition={{ delay: 0.2, type: 'spring' }}
+          >
+            <CsubShield />
+          </motion.div>
+        </div>
+
+        <h2 className="font-display text-3xl font-bold text-csub-blue-dark uppercase tracking-wide mb-2">
+          Congratulations!
         </h2>
-        <p className="font-body text-lg text-gray-600 mb-2">
-          All steps complete! You are officially ready for your first day at
+
+        <div className="w-16 h-0.5 bg-csub-gold mx-auto my-4" />
+
+        <p className="font-body text-base text-csub-gray mb-1">
+          All steps complete. You are officially ready for
         </p>
-        <p className="font-display text-2xl font-bold text-csub-gold mb-6">
-          CSU Bakersfield!
+        <p className="font-display text-xl font-bold text-csub-blue uppercase tracking-wider mb-6">
+          Your first day at CSU Bakersfield
         </p>
-        <div className="text-5xl mb-6 animate-bounce-slow">🐦</div>
-        <p className="font-body text-csub-blue font-bold text-lg mb-6">
+
+        <p className="font-display text-csub-gold text-lg font-bold uppercase tracking-widest mb-8">
           Go Runners!
         </p>
+
         <button
           onClick={onClose}
-          className="bg-csub-blue text-white font-display font-bold py-3 px-8 rounded-full
+          className="bg-csub-blue text-white font-display font-bold uppercase tracking-wider py-3 px-10 rounded
                      hover:bg-csub-blue-dark transition-colors shadow-lg
-                     hover:shadow-xl active:scale-95 transform"
+                     hover:shadow-xl active:scale-95 transform text-sm"
         >
-          Let&apos;s Go!
+          Continue
         </button>
       </motion.div>
     </motion.div>

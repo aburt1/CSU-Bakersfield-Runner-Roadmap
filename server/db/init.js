@@ -43,6 +43,18 @@ export function initDatabase() {
     );
   `);
 
+  // Migrations — add new columns (safe to re-run)
+  const migrations = [
+    'ALTER TABLE steps ADD COLUMN guide_content TEXT',
+    'ALTER TABLE steps ADD COLUMN links TEXT',
+    'ALTER TABLE steps ADD COLUMN required_tags TEXT',
+    'ALTER TABLE steps ADD COLUMN is_active INTEGER DEFAULT 1',
+    'ALTER TABLE students ADD COLUMN tags TEXT',
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch { /* column already exists */ }
+  }
+
   // Seed default steps if empty
   const count = db.prepare('SELECT COUNT(*) as count FROM steps').get();
   if (count.count === 0) {

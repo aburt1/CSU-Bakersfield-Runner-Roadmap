@@ -5,27 +5,23 @@ export default function ProgressBar({ completed, total }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-      className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-csub-blue/10 px-4 py-3"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.3 }}
+      className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3"
     >
-      <div className="max-w-xl mx-auto">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-display text-sm font-bold text-csub-blue">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="font-display text-sm font-semibold text-csub-blue-dark uppercase tracking-wider">
             Your Progress
           </span>
-          <span className="font-body text-sm font-bold text-csub-blue">
-            {completed}/{total} steps
-            {completed === total && total > 0 && ' 🎉'}
+          <span className="font-body text-sm font-semibold text-csub-gray">
+            {completed} of {total} complete
           </span>
         </div>
-        <div className="h-3 bg-csub-blue/10 rounded-full overflow-hidden">
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
           <motion.div
-            className="h-full rounded-full"
-            style={{
-              background: 'linear-gradient(90deg, #003594, #FFC72C)',
-            }}
+            className="h-full rounded-full bg-csub-blue"
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
             transition={{ duration: 0.8, ease: 'easeOut' }}

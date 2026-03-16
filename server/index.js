@@ -8,6 +8,7 @@ import { dirname, join } from 'path';
 import { initDatabase } from './db/init.js';
 import stepsRouter from './routes/steps.js';
 import authRouter from './routes/auth.js';
+import adminRouter from './routes/admin.js';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use((req, res, next) => {
 // API routes
 app.use('/api/auth', authRouter);
 app.use('/api/steps', stepsRouter);
+app.use('/api/admin', adminRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

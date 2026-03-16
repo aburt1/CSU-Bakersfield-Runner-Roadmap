@@ -1,7 +1,10 @@
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-to-a-secure-random-string';
+
 /**
  * Authentication middleware.
- * Currently uses simple token-based auth (student ID as token).
- * Will be upgraded to Azure AD JWT validation in production.
+ * Validates JWT tokens issued after Azure AD login.
  */
 export function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -12,18 +15,19 @@ export function authMiddleware(req, res, next) {
 
   const token = authHeader.slice(7);
 
-  if (!token || token.length < 10) {
-    return res.status(401).json({ error: 'Invalid token' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.studentId = payload.studentId;
+    req.studentEmail = payload.email;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
 
-  // Verify student exists in database
-  const student = req.db.prepare('SELECT id FROM students WHERE id = ?').get(token);
-
-  if (!student) {
-    return res.status(401).json({ error: 'Invalid session' });
-  }
-
-  // Attach student ID to request for downstream use
-  req.studentId = token;
-  next();
+/**
+ * Sign a JWT for a student session.
+ */
+export function signToken(studentId, email) {
+  return jwt.sign({ studentId, email }, JWT_SECRET, { expiresIn: '8h' });
 }

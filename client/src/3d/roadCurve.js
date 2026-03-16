@@ -127,13 +127,16 @@ export function getMilestonePosition(index) {
   return roadCurve.getPoint(t);
 }
 
-// Camera path: parallel to road but elevated and slightly behind
+// Camera path: elevated view following the road
 export function getCameraPosition(t) {
   const roadPos = roadCurve.getPoint(Math.min(t, 1));
-  return new THREE.Vector3(roadPos.x * 0.3, 14, roadPos.z + 6);
+  // Height 18, offset +10 on Z (behind the road point), slight X centering
+  return new THREE.Vector3(roadPos.x * 0.15, 18, roadPos.z + 10);
 }
 
 export function getCameraLookAt(t) {
-  const lookT = Math.min(t + 0.06, 1);
-  return roadCurve.getPoint(lookT);
+  const lookT = Math.min(t + 0.04, 1);
+  const target = roadCurve.getPoint(lookT);
+  // Look slightly above the road surface
+  return new THREE.Vector3(target.x, 0.5, target.z);
 }

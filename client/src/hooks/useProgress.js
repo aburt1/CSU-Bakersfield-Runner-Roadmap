@@ -1,111 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 
 const API_BASE = '/api';
+const POLL_INTERVAL = 30000; // 30 seconds
 
 export function useProgress() {
-  const [token, setToken] = useState(() => localStorage.getItem('csub_token'));
+  const { token, isAuthenticated } = useAuth();
+  const [steps, setSteps] = useState([]);
   const [completedSteps, setCompletedSteps] = useState(new Set());
+  const [studentTags, setStudentTags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef(null);
 
-  // Initialize guest session if needed
+  // Fetch steps from API
   useEffect(() => {
-    async function initSession() {
-      if (!token) {
-        try {
-          const res = await fetch(`${API_BASE}/auth/guest`, { method: 'POST' });
-          if (res.ok) {
-            const data = await res.json();
-            localStorage.setItem('csub_token', data.token);
-            setToken(data.token);
-          }
-        } catch {
-          console.warn('Server not available, using local storage only');
-          setToken('local');
-        }
-      }
-      setLoading(false);
-    }
-    initSession();
-  }, [token]);
-
-  // Fetch progress from server
-  useEffect(() => {
-    async function fetchProgress() {
-      if (!token || token === 'local') {
-        // Fallback: load from localStorage
-        const saved = localStorage.getItem('csub_progress');
-        if (saved) {
-          setCompletedSteps(new Set(JSON.parse(saved)));
-        }
-        return;
-      }
-
+    async function fetchSteps() {
       try {
-        const res = await fetch(`${API_BASE}/steps/progress`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`${API_BASE}/steps`);
         if (res.ok) {
-          const progress = await res.json();
-          setCompletedSteps(new Set(progress.map((p) => p.step_id)));
+          const data = await res.json();
+          setSteps(data);
         }
       } catch {
-        // Fallback to localStorage
-        const saved = localStorage.getItem('csub_progress');
-        if (saved) {
-          setCompletedSteps(new Set(JSON.parse(saved)));
-        }
+        // Server unavailable
       }
     }
+    fetchSteps();
+  }, []);
 
-    if (token) fetchProgress();
-  }, [token]);
+  // Fetch progress + tags from server
+  const fetchProgress = async () => {
+    if (!token) return;
 
-  // Save to localStorage whenever progress changes
-  useEffect(() => {
-    if (completedSteps.size > 0) {
-      localStorage.setItem('csub_progress', JSON.stringify([...completedSteps]));
-    }
-  }, [completedSteps]);
-
-  const toggleStep = useCallback(
-    async (stepId) => {
-      const isCompleted = completedSteps.has(stepId);
-      const method = isCompleted ? 'DELETE' : 'POST';
-
-      // Optimistic update
-      setCompletedSteps((prev) => {
-        const next = new Set(prev);
-        if (isCompleted) {
-          next.delete(stepId);
-        } else {
-          next.add(stepId);
-        }
-        return next;
+    try {
+      const res = await fetch(`${API_BASE}/steps/progress`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      // Sync with server
-      if (token && token !== 'local') {
-        try {
-          await fetch(`${API_BASE}/steps/${stepId}/complete`, {
-            method,
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch {
-          // Revert on failure
-          setCompletedSteps((prev) => {
-            const next = new Set(prev);
-            if (isCompleted) {
-              next.add(stepId);
-            } else {
-              next.delete(stepId);
-            }
-            return next;
-          });
-        }
+      if (res.ok) {
+        const data = await res.json();
+        setCompletedSteps(new Set(data.progress.map((p) => p.step_id)));
+        setStudentTags(data.tags || []);
       }
-    },
-    [token, completedSteps]
-  );
+    } catch {
+      // Server unavailable
+    }
+  };
 
-  return { completedSteps, toggleStep, loading };
+  // Initial fetch
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
+    fetchProgress().then(() => setLoading(false));
+  }, [isAuthenticated, token]);
+
+  // Poll for updates every 30s
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    intervalRef.current = setInterval(fetchProgress, POLL_INTERVAL);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isAuthenticated, token]);
+
+  return { steps, completedSteps, studentTags, loading };
 }
