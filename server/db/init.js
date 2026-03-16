@@ -41,6 +41,19 @@ export function initDatabase() {
       FOREIGN KEY (student_id) REFERENCES students(id),
       FOREIGN KEY (step_id) REFERENCES steps(id)
     );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      changed_by TEXT NOT NULL,
+      details TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
   `);
 
   // Migrations — add new columns (safe to re-run)
