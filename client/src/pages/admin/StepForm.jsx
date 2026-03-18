@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TagEditor from './TagEditor';
+import RichTextEditor from './RichTextEditor';
 
 export default function StepForm({ step, onSave, onCancel }) {
   const [title, setTitle] = useState(step?.title || '');
@@ -8,9 +9,6 @@ export default function StepForm({ step, onSave, onCancel }) {
   const [deadline, setDeadline] = useState(step?.deadline || '');
   const [deadlineDate, setDeadlineDate] = useState(step?.deadline_date || '');
   const [guideContent, setGuideContent] = useState(step?.guide_content || '');
-  const [linksText, setLinksText] = useState(
-    step?.links ? (typeof step.links === 'string' ? step.links : JSON.stringify(step.links, null, 2)) : ''
-  );
   const [requiredTags, setRequiredTags] = useState(
     step?.required_tags
       ? (typeof step.required_tags === 'string' ? JSON.parse(step.required_tags) : step.required_tags)
@@ -28,15 +26,6 @@ export default function StepForm({ step, onSave, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    let parsedLinks = null;
-    if (linksText.trim()) {
-      try {
-        parsedLinks = JSON.parse(linksText);
-      } catch {
-        alert('Links must be valid JSON: [{"label":"...","url":"..."}]');
-        return;
-      }
-    }
 
     const contactInfo = (contactName || contactEmail || contactPhone)
       ? { name: contactName || null, email: contactEmail || null, phone: contactPhone || null }
@@ -49,7 +38,7 @@ export default function StepForm({ step, onSave, onCancel }) {
       deadline: deadline || null,
       deadline_date: deadlineDate || null,
       guide_content: guideContent || null,
-      links: parsedLinks,
+      links: null, // links are now embedded inline via the rich text editor
       required_tags: requiredTags.length > 0 ? requiredTags : null,
       sort_order: sortOrder !== '' ? parseInt(sortOrder, 10) : undefined,
       contact_info: contactInfo,
@@ -104,25 +93,8 @@ export default function StepForm({ step, onSave, onCancel }) {
       </label>
 
       <div>
-        <label className={label}>Guide Content (detailed instructions)</label>
-        <textarea
-          value={guideContent}
-          onChange={(e) => setGuideContent(e.target.value)}
-          rows={4}
-          className={field}
-          placeholder="Detailed instructions for completing this step..."
-        />
-      </div>
-
-      <div>
-        <label className={label}>Links (JSON array)</label>
-        <textarea
-          value={linksText}
-          onChange={(e) => setLinksText(e.target.value)}
-          rows={3}
-          className={`${field} font-mono text-xs`}
-          placeholder='[{"label":"Apply Here","url":"https://..."}]'
-        />
+        <label className={label}>Guide Content (detailed instructions — use the toolbar to add links)</label>
+        <RichTextEditor value={guideContent} onChange={setGuideContent} />
       </div>
 
       <div>

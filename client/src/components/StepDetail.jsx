@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 
 export default function StepDetail({ step, completed, onClose }) {
   if (!step) return null;
 
   const links = step.links ? (typeof step.links === 'string' ? JSON.parse(step.links) : step.links) : [];
+  const isHtmlContent = step.guide_content && /<[a-z][\s\S]*>/i.test(step.guide_content);
 
   return (
     <motion.div
@@ -78,14 +80,21 @@ export default function StepDetail({ step, completed, onClose }) {
               <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-2">
                 How to Complete This Step
               </h3>
-              <div className="font-body text-sm text-csub-gray leading-relaxed whitespace-pre-wrap">
-                {step.guide_content}
-              </div>
+              {isHtmlContent ? (
+                <div
+                  className="prose prose-sm max-w-none font-body text-sm text-csub-gray leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(step.guide_content) }}
+                />
+              ) : (
+                <div className="font-body text-sm text-csub-gray leading-relaxed whitespace-pre-wrap">
+                  {step.guide_content}
+                </div>
+              )}
             </div>
           )}
 
           {/* Links */}
-          {links.length > 0 && (
+          {!isHtmlContent && links.length > 0 && (
             <div>
               <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-2">
                 Helpful Links

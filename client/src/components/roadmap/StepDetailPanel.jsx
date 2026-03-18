@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 
 const STATUS_LABELS = {
   completed: { label: 'Completed', class: 'bg-emerald-50 text-emerald-700' },
@@ -12,6 +13,7 @@ const STATUS_LABELS = {
 export default function StepDetailPanel({ step, stepNumber, totalSteps, completedAt, onClose, onNavigate, hasPrev, hasNext }) {
   const panelRef = useRef(null);
   const links = step.links ? (typeof step.links === 'string' ? JSON.parse(step.links) : step.links) : [];
+  const isHtmlContent = step.guide_content && /<[a-z][\s\S]*>/i.test(step.guide_content);
   const statusConfig = STATUS_LABELS[step.status] || STATUS_LABELS.not_started;
 
   // Trap focus and handle escape
@@ -155,9 +157,16 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
                 </svg>
                 How to Complete This Step
               </h3>
-              <div className="font-body text-sm text-csub-gray leading-relaxed whitespace-pre-wrap">
-                {step.guide_content}
-              </div>
+              {isHtmlContent ? (
+                <div
+                  className="prose prose-sm max-w-none font-body text-sm text-csub-gray leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(step.guide_content) }}
+                />
+              ) : (
+                <div className="font-body text-sm text-csub-gray leading-relaxed whitespace-pre-wrap">
+                  {step.guide_content}
+                </div>
+              )}
             </div>
           )}
 
@@ -173,8 +182,8 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
             </div>
           )}
 
-          {/* Action links */}
-          {links.length > 0 && step.status !== 'locked' && (
+          {/* Action links — only show for old-format steps (non-HTML guide content) */}
+          {!isHtmlContent && links.length > 0 && step.status !== 'locked' && (
             <div>
               <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-3">
                 Helpful Links
@@ -244,7 +253,7 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
         {/* Footer */}
         <div className="px-5 sm:px-6 pb-6 pt-2">
           {/* Primary action for in-progress */}
-          {step.status === 'in_progress' && links.length > 0 && (
+          {step.status === 'in_progress' && !isHtmlContent && links.length > 0 && (
             <a
               href={links[0].url}
               target="_blank"
