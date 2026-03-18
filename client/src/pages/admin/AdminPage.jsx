@@ -105,44 +105,39 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-csub-blue-dark text-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-xl font-bold uppercase tracking-wide">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+          {/* Top row: title + user actions */}
+          <div className="flex items-center justify-between">
+            <h1 className="font-display text-lg font-bold uppercase tracking-wide">
               CSUB Admissions Admin
             </h1>
-            <p className="font-body text-sm text-white/50 mt-0.5">
-              Manage steps, student progress, and audit history
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Term selector */}
-            {terms.length > 0 && (
-              <select
-                value={selectedTermId || ''}
-                onChange={(e) => setSelectedTermId(parseInt(e.target.value, 10))}
-                className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-gold"
-              >
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id} className="text-gray-900">
-                    {t.name}{t.is_active ? '' : ' (inactive)'}
-                  </option>
-                ))}
-              </select>
-            )}
-            {adminUser && (
-              <div className="text-right">
-                <p className="font-body text-sm font-medium">{adminUser.displayName}</p>
-                <span className="inline-block text-xs px-2 py-0.5 rounded-full font-body bg-white/15 text-white/80">
+            <div className="flex items-center gap-3 text-sm font-body">
+              <span className="text-white/70">
+                {adminUser?.displayName}
+                <span className="text-white/40 ml-1.5 text-xs">
                   {ROLES[role]?.label || role}
                 </span>
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="font-body text-sm text-white/60 hover:text-white transition-colors"
-            >
-              Sign Out
-            </button>
+              </span>
+              {terms.length > 0 && (
+                <select
+                  value={selectedTermId || ''}
+                  onChange={(e) => setSelectedTermId(parseInt(e.target.value, 10))}
+                  className="bg-white/10 text-white border border-white/20 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-csub-gold"
+                >
+                  {terms.map((t) => (
+                    <option key={t.id} value={t.id} className="text-gray-900">
+                      {t.name}{t.is_active ? '' : ' (inactive)'}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={handleLogout}
+                className="text-white/50 hover:text-white transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </div>

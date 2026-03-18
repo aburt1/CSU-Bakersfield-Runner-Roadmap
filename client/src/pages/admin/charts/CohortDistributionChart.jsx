@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 
 const COLORS = ['#DC2626', '#F59E0B', '#3B82F6', '#003594', '#FFC72C'];
 const BUCKET_ORDER = ['0%', '1-25%', '26-50%', '51-75%', '76-100%'];
@@ -12,31 +12,35 @@ export default function CohortDistributionChart({ data }) {
     name: bucket,
     value: bucketMap[bucket] || 0,
     color: COLORS[i],
-  })).filter((d) => d.value > 0);
+  }));
 
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            outerRadius={90}
-            innerRadius={40}
-            dataKey="value"
-            label={({ name, value }) => `${name}: ${value}`}
+        <BarChart data={chartData} margin={{ left: 10, right: 30, top: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="name"
             fontSize={11}
-          >
+            tick={{ fill: '#001A70' }}
+            label={{ value: 'Completion %', position: 'insideBottom', offset: -2, fontSize: 10, fill: '#6b7280' }}
+          />
+          <YAxis
+            fontSize={11}
+            allowDecimals={false}
+            label={{ value: 'Students', angle: -90, position: 'insideLeft', offset: 0, fontSize: 10, fill: '#6b7280' }}
+          />
+          <Tooltip
+            formatter={(value) => [`${value} students`, 'Count']}
+            labelFormatter={(label) => `Progress: ${label}`}
+          />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {chartData.map((entry, i) => (
               <Cell key={i} fill={entry.color} />
             ))}
-          </Pie>
-          <Tooltip formatter={(value) => [`${value} students`]} />
-          <Legend
-            formatter={(value) => <span className="font-body text-xs">{value}</span>}
-          />
-        </PieChart>
+            <LabelList dataKey="value" position="top" fontSize={11} fill="#374151" />
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );

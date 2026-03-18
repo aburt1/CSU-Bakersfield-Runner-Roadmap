@@ -22,9 +22,9 @@ const PORT = process.env.PORT || 3001;
 // Security middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? 'https://your-domain.csub.edu'
-    : 'http://localhost:3000',
+  origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production'
+    ? true  // allow same-origin in production (served from same Express server)
+    : 'http://localhost:3000'),
   credentials: true,
 }));
 
@@ -61,11 +61,12 @@ app.use(express.json());
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Serve static files in production
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(join(__dirname, '../client/dist')));
+  // Serve static files in production (or whenever NODE_ENV !== 'development')
+  if (process.env.NODE_ENV !== 'development') {
+    const distPath = join(__dirname, '../client/dist');
+    app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(join(__dirname, '../client/dist/index.html'));
+      res.sendFile(join(distPath, 'index.html'));
     });
   }
 

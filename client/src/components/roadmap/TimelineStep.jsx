@@ -38,6 +38,13 @@ const STATUS_CONFIG = {
     badgeLabel: 'Waived',
     cardClass: 'border-gray-200 bg-gray-50',
   },
+  preview: {
+    nodeClass: 'bg-white border-csub-blue text-csub-blue',
+    icon: null,
+    badgeClass: '',
+    badgeLabel: '',
+    cardClass: 'border-gray-200 bg-white',
+  },
   locked: {
     nodeClass: 'bg-gray-100 border-gray-300 text-gray-400',
     icon: (
@@ -132,12 +139,14 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
             {/* Meta row: badges, deadline, action */}
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {/* Status badge */}
-              <span className={`inline-flex items-center gap-1 text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${config.badgeClass}`}>
-                {step.status === 'in_progress' && (
-                  <span className="w-1.5 h-1.5 bg-csub-blue rounded-full animate-pulse" aria-hidden="true" />
-                )}
-                {config.badgeLabel}
-              </span>
+              {config.badgeLabel && (
+                <span className={`inline-flex items-center gap-1 text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${config.badgeClass}`}>
+                  {step.status === 'in_progress' && (
+                    <span className="w-1.5 h-1.5 bg-csub-blue rounded-full animate-pulse" aria-hidden="true" />
+                  )}
+                  {config.badgeLabel}
+                </span>
+              )}
 
               {/* Deadline */}
               {step.deadline && (

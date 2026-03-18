@@ -133,14 +133,17 @@ export default function RoadmapPage() {
                 Your step-by-step guide to becoming a Roadrunner
               </p>
             </div>
-            <HighContrastToggle />
-            <button
-              onClick={logout}
-              className="font-body text-sm text-white/60 hover:text-white transition-colors flex-shrink-0 mt-1"
-              aria-label="Sign out"
-            >
-              Sign out
-            </button>
+            <div className="flex items-center gap-3 flex-shrink-0 mt-1">
+              <HighContrastToggle />
+              <span className="text-white/30">·</span>
+              <button
+                onClick={logout}
+                className="font-body text-sm text-white/60 hover:text-white transition-colors"
+                aria-label="Sign out"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </header>

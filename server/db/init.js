@@ -157,5 +157,113 @@ export async function initDatabase() {
     console.log('Seeded 9 admissions steps');
   }
 
+  // Seed 50 sample students if empty
+  const studentCount = db.prepare('SELECT COUNT(*) as count FROM students').get();
+  if (studentCount.count === 0) {
+    const defaultTerm = db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1').get();
+    const termId = defaultTerm?.id || 1;
+    const stepRows = db.prepare('SELECT id, sort_order FROM steps WHERE term_id = ? ORDER BY sort_order').all(termId);
+
+    // Realistic first/last name pools (diverse Central Valley demographics)
+    const firstNames = [
+      'Sofia', 'Miguel', 'Emily', 'Jose', 'Maria', 'David', 'Isabella', 'Carlos',
+      'Ashley', 'Angel', 'Jasmine', 'Luis', 'Alyssa', 'Diego', 'Samantha', 'Juan',
+      'Brianna', 'Daniel', 'Gabriela', 'Andres', 'Maya', 'Kevin', 'Priya', 'Omar',
+      'Rachel', 'Alejandro', 'Destiny', 'Marco', 'Chloe', 'Eduardo', 'Fatima', 'Ethan',
+      'Lucia', 'Ryan', 'Vanessa', 'Jorge', 'Mia', 'Anthony', 'Karina', 'Tyler',
+      'Andrea', 'Nathan', 'Rosa', 'Brandon', 'Jessica', 'Victor', 'Lauren', 'Adrian',
+      'Natalie', 'Christian',
+    ];
+    const lastNames = [
+      'Garcia', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Perez',
+      'Sanchez', 'Rivera', 'Torres', 'Flores', 'Ramirez', 'Morales', 'Cruz', 'Reyes',
+      'Nguyen', 'Patel', 'Singh', 'Chen', 'Kim', 'Johnson', 'Williams', 'Brown',
+      'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson', 'Thomas',
+      'Jackson', 'White', 'Harris', 'Clark', 'Lewis', 'Walker', 'Hall', 'Allen',
+      'Young', 'King', 'Wright', 'Scott', 'Adams', 'Baker', 'Nelson', 'Carter',
+      'Mitchell', 'Campbell', 'Roberts', 'Phillips',
+    ];
+
+    const tagOptions = [
+      '["first-gen"]',
+      '["transfer"]',
+      '["out-of-state"]',
+      '["first-gen","eop"]',
+      '["honors"]',
+      '["athlete"]',
+      '["transfer","veteran"]',
+      '["first-gen","honors"]',
+      '["veteran"]',
+      '["eop"]',
+      null, null, null, // ~25% have no tags
+    ];
+
+    const insertStudent = db.prepare(
+      'INSERT INTO students (id, display_name, email, azure_id, tags, term_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    const insertProgress = db.prepare(
+      'INSERT INTO student_progress (student_id, step_id, completed_at, status) VALUES (?, ?, ?, ?)'
+    );
+
+    // Progression profiles — how far along each student is (realistic distribution)
+    // Most students cluster in the middle steps; a few are very early or fully done
+    const progressionWeights = [
+      { stepsCompleted: 0, weight: 2 },   // just accepted, haven't started
+      { stepsCompleted: 1, weight: 3 },
+      { stepsCompleted: 2, weight: 5 },   // activated account
+      { stepsCompleted: 3, weight: 6 },   // submitted intent
+      { stepsCompleted: 4, weight: 7 },   // signed into email
+      { stepsCompleted: 5, weight: 8 },   // registered for orientation
+      { stepsCompleted: 6, weight: 7 },   // attended orientation
+      { stepsCompleted: 7, weight: 5 },   // met advisor
+      { stepsCompleted: 8, weight: 4 },   // moved in
+      { stepsCompleted: 9, weight: 3 },   // all done
+    ];
+
+    // Build weighted array
+    const progressionPool = [];
+    for (const p of progressionWeights) {
+      for (let i = 0; i < p.weight; i++) {
+        progressionPool.push(p.stepsCompleted);
+      }
+    }
+
+    const seedStudents = db.transaction(() => {
+      for (let i = 0; i < 50; i++) {
+        const first = firstNames[i];
+        const last = lastNames[i % lastNames.length];
+        const name = `${first} ${last}`;
+        const email = `${first.toLowerCase()}${last.toLowerCase().charAt(0)}@csub.edu`;
+        const id = `seed-student-${String(i + 1).padStart(3, '0')}`;
+        const azureId = `azure-${id}`;
+        const tags = tagOptions[i % tagOptions.length];
+
+        // Stagger created_at dates over the last 60 days
+        const daysAgo = Math.floor(Math.random() * 60) + 1;
+        const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
+
+        insertStudent.run(id, name, email, azureId, tags, termId, createdAt);
+
+        // Assign progress based on weighted profile
+        const stepsCompleted = progressionPool[i % progressionPool.length];
+        const completableSteps = stepRows.slice(0, stepsCompleted);
+
+        for (let j = 0; j < completableSteps.length; j++) {
+          const step = completableSteps[j];
+          // Completion dates spread out: earlier steps completed earlier
+          const completionDaysAgo = daysAgo - j * 2 - Math.floor(Math.random() * 3);
+          const completedAt = new Date(Date.now() - Math.max(completionDaysAgo, 1) * 86400000).toISOString();
+
+          // ~5% chance a step is waived instead of completed
+          const status = (Math.random() < 0.05) ? 'waived' : 'completed';
+          insertProgress.run(id, step.id, completedAt, status);
+        }
+      }
+    });
+
+    seedStudents();
+    console.log('Seeded 50 sample students with realistic progress');
+  }
+
   return db;
 }
