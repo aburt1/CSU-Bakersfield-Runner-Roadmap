@@ -68,6 +68,52 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
+// PUT /api/admin/steps/reorder — bulk update sort_order (admissions_editor+)
+// NOTE: Must be defined BEFORE /steps/:id to avoid Express matching "reorder" as :id
+router.put('/steps/reorder', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
+  const { order } = req.body;
+
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ error: 'order must be an array of {id, sort_order}' });
+  }
+
+  const update = req.db.prepare('UPDATE steps SET sort_order = ? WHERE id = ?');
+  const reorder = req.db.transaction((items) => {
+    for (const item of items) {
+      update.run(item.sort_order, item.id);
+    }
+  });
+  reorder(order);
+
+  res.json({ success: true });
+});
+
+// PUT /api/admin/steps/bulk-status — bulk activate/deactivate (admissions_editor+)
+// NOTE: Must be defined BEFORE /steps/:id to avoid Express matching "bulk-status" as :id
+router.put('/steps/bulk-status', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
+  const { stepIds, is_active } = req.body;
+
+  if (!Array.isArray(stepIds) || (is_active !== 0 && is_active !== 1)) {
+    return res.status(400).json({ error: 'stepIds (array) and is_active (0|1) required' });
+  }
+
+  const update = req.db.prepare('UPDATE steps SET is_active = ? WHERE id = ?');
+  const bulkUpdate = req.db.transaction((ids) => {
+    for (const id of ids) {
+      update.run(is_active, id);
+      logAudit(req.db, req, {
+        entityType: 'step',
+        entityId: id,
+        action: is_active ? 'step_restore' : 'step_delete',
+        details: { bulk: true },
+      });
+    }
+  });
+  bulkUpdate(stepIds);
+
+  res.json({ success: true });
+});
+
 // PUT /api/admin/steps/:id — update a step (admissions_editor+)
 router.put('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -127,25 +173,6 @@ router.delete('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, 
   res.json({ success: true });
 });
 
-// PUT /api/admin/steps/reorder — bulk update sort_order (admissions_editor+)
-router.put('/steps/reorder', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
-  const { order } = req.body;
-
-  if (!Array.isArray(order)) {
-    return res.status(400).json({ error: 'order must be an array of {id, sort_order}' });
-  }
-
-  const update = req.db.prepare('UPDATE steps SET sort_order = ? WHERE id = ?');
-  const reorder = req.db.transaction((items) => {
-    for (const item of items) {
-      update.run(item.sort_order, item.id);
-    }
-  });
-  reorder(order);
-
-  res.json({ success: true });
-});
-
 // POST /api/admin/steps/:id/duplicate — duplicate a step (admissions_editor+)
 router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -183,31 +210,6 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
   });
 
   res.json({ success: true, id: result.lastInsertRowid });
-});
-
-// PUT /api/admin/steps/bulk-status — bulk activate/deactivate (admissions_editor+)
-router.put('/steps/bulk-status', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
-  const { stepIds, is_active } = req.body;
-
-  if (!Array.isArray(stepIds) || (is_active !== 0 && is_active !== 1)) {
-    return res.status(400).json({ error: 'stepIds (array) and is_active (0|1) required' });
-  }
-
-  const update = req.db.prepare('UPDATE steps SET is_active = ? WHERE id = ?');
-  const bulkUpdate = req.db.transaction((ids) => {
-    for (const id of ids) {
-      update.run(is_active, id);
-      logAudit(req.db, req, {
-        entityType: 'step',
-        entityId: id,
-        action: is_active ? 'step_restore' : 'step_delete',
-        details: { bulk: true },
-      });
-    }
-  });
-  bulkUpdate(stepIds);
-
-  res.json({ success: true });
 });
 
 // ─── Student Progress ────────────────────────────────────
@@ -315,10 +317,15 @@ router.put('/students/:studentId/tags', requireRole('admissions', 'admissions_ed
   res.json({ success: true });
 });
 
-// GET /api/admin/students — with progress counts, optional ?term_id= and ?search=
+// GET /api/admin/students — paginated, with progress counts
+// Query params: search, term_id, page (default 1), per_page (default 25),
+//   sort (date_desc|date_asc|name_asc|name_desc|progress_asc|progress_desc), overdue_only (0|1)
 router.get('/students', (req, res) => {
-  const { search, term_id } = req.query;
+  const { search, term_id, sort = 'date_desc', overdue_only } = req.query;
   const termId = term_id ? parseInt(term_id, 10) : null;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 25));
+  const offset = (page - 1) * perPage;
 
   const baseQuery = `
     SELECT s.id, s.display_name, s.email, s.azure_id, s.tags, s.created_at, s.term_id,
@@ -351,16 +358,37 @@ router.get('/students', (req, res) => {
     where.push('s.term_id = ?');
     params.push(termId);
   }
+  if (overdue_only === '1') {
+    where.push('COALESCE(ov.overdue_count, 0) > 0');
+  }
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+  // Sort mapping
+  const sortMap = {
+    date_desc: 's.created_at DESC',
+    date_asc: 's.created_at ASC',
+    name_asc: 's.display_name ASC',
+    name_desc: 's.display_name DESC',
+    progress_asc: 'completed_steps ASC',
+    progress_desc: 'completed_steps DESC',
+  };
+  const orderBy = sortMap[sort] || sortMap.date_desc;
+
+  // Count query
+  const total = req.db.prepare(`
+    SELECT COUNT(*) as count FROM (${baseQuery} ${whereClause})
+  `).get(...params).count;
+
+  // Data query
   const students = req.db.prepare(`
     ${baseQuery}
     ${whereClause}
-    ORDER BY s.created_at DESC
-    LIMIT 100
-  `).all(...params);
+    ORDER BY ${orderBy}
+    LIMIT ? OFFSET ?
+  `).all(...params, perPage, offset);
 
-  res.json(students);
+  res.json({ students, total, page, per_page: perPage });
 });
 
 // ─── Audit Log ───────────────────────────────────────────

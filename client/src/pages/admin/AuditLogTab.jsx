@@ -33,8 +33,8 @@ export default function AuditLogTab({ api }) {
   const handleSearch = async () => {
     if (studentSearch.trim()) {
       try {
-        const results = await api.get(`/students?search=${encodeURIComponent(studentSearch)}`);
-        setStudentResults(results);
+        const data = await api.get(`/students?search=${encodeURIComponent(studentSearch)}`);
+        setStudentResults(data.students || []);
       } catch {
         setStudentResults([]);
       }

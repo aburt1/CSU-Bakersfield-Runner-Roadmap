@@ -1,6 +1,166 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Reorder, useDragControls } from 'framer-motion';
 import StepForm from './StepForm';
 
+// ─── Drag Handle Icon ────────────────────────────────────
+function GripIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+      <circle cx="5" cy="3" r="1.5" />
+      <circle cx="11" cy="3" r="1.5" />
+      <circle cx="5" cy="8" r="1.5" />
+      <circle cx="11" cy="8" r="1.5" />
+      <circle cx="5" cy="13" r="1.5" />
+      <circle cx="11" cy="13" r="1.5" />
+    </svg>
+  );
+}
+
+// ─── Draggable Step Row ──────────────────────────────────
+function DraggableStepRow({
+  step, index, totalVisible, canEdit, selected, editingStepId,
+  onToggleSelect, onMoveStep, onEdit, onDuplicate, onDelete, onRestore, onSave, onCancelEdit,
+}) {
+  const dragControls = useDragControls();
+  const isEditing = editingStepId === step.id;
+
+  const content = (
+    <>
+      <div
+        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border shadow-sm transition-all hover:shadow-md ${
+          step.is_active === 0
+            ? 'border-gray-200 bg-gray-50 opacity-60'
+            : 'border-gray-200 bg-white'
+        }`}
+      >
+        {canEdit && (
+          <>
+            {/* Drag handle */}
+            <div
+              onPointerDown={(e) => dragControls.start(e)}
+              className="cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-csub-blue transition-colors flex-shrink-0"
+              title="Drag to reorder"
+            >
+              <GripIcon />
+            </div>
+
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              className="rounded flex-shrink-0"
+            />
+
+            {/* Arrow buttons (keyboard accessibility fallback) */}
+            <div className="flex flex-col gap-0.5">
+              <button
+                onClick={() => onMoveStep(index, -1)}
+                disabled={index === 0}
+                className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
+                title="Move up"
+              >
+                ▲
+              </button>
+              <button
+                onClick={() => onMoveStep(index, 1)}
+                disabled={index === totalVisible - 1}
+                className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
+                title="Move down"
+              >
+                ▼
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Icon */}
+        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
+          {step.icon || '📋'}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-body text-sm font-semibold text-csub-blue-dark truncate">
+            {step.title}
+            {step.is_public === 1 && (
+              <span className="ml-2 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-body font-medium align-middle">
+                Public
+              </span>
+            )}
+          </p>
+          <p className="font-body text-xs text-csub-gray truncate">
+            {step.description || 'No description'}
+            {step.deadline && <span className="text-amber-600 ml-1">— {step.deadline}</span>}
+          </p>
+          {step.required_tags && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {(typeof step.required_tags === 'string' ? JSON.parse(step.required_tags) : step.required_tags).map((tag) => (
+                <span key={tag} className="text-[10px] bg-csub-blue/10 text-csub-blue-dark px-1.5 py-0.5 rounded-full font-body">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {canEdit && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => onEdit(step)}
+              className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDuplicate(step.id)}
+              className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
+            >
+              Duplicate
+            </button>
+            {step.is_active === 0 ? (
+              <button
+                onClick={() => onRestore(step.id)}
+                className="font-body text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+              >
+                Restore
+              </button>
+            ) : (
+              <button
+                onClick={() => onDelete(step.id)}
+                className="font-body text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {canEdit && isEditing && (
+        <div className="mt-2 mb-4">
+          <StepForm step={step} onSave={onSave} onCancel={onCancelEdit} />
+        </div>
+      )}
+    </>
+  );
+
+  if (!canEdit) {
+    return <div>{content}</div>;
+  }
+
+  return (
+    <Reorder.Item
+      value={step}
+      dragListener={false}
+      dragControls={dragControls}
+      whileDrag={{ scale: 1.02, boxShadow: '0 8px 25px rgba(0,0,0,0.12)', zIndex: 50 }}
+      style={{ position: 'relative' }}
+    >
+      {content}
+    </Reorder.Item>
+  );
+}
+
+// ─── Steps Tab ───────────────────────────────────────────
 export default function StepsTab({ api, role = 'viewer', termId }) {
   const canEdit = role === 'admissions_editor' || role === 'sysadmin';
   const [steps, setSteps] = useState([]);
@@ -75,6 +235,24 @@ export default function StepsTab({ api, role = 'viewer', termId }) {
     } catch { /* ignore */ }
   };
 
+  // Drag-and-drop reorder handler — debounced API call
+  const saveTimerRef = useRef(null);
+  const handleDragReorder = (reorderedVisible) => {
+    // Optimistic local update on every frame (smooth visual)
+    const updatedSteps = steps.map((s) => {
+      const newIndex = reorderedVisible.findIndex((v) => v.id === s.id);
+      return newIndex !== -1 ? { ...s, sort_order: newIndex + 1 } : s;
+    });
+    setSteps(updatedSteps);
+
+    // Debounce the API save — only fires 500ms after dragging stops
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const order = reorderedVisible.map((s, i) => ({ id: s.id, sort_order: i + 1 }));
+      api.put('/steps/reorder', { order }).catch(() => fetchSteps());
+    }, 500);
+  };
+
   const toggleSelect = (id) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -107,6 +285,23 @@ export default function StepsTab({ api, role = 'viewer', termId }) {
   const sortedSteps = [...steps].sort((a, b) => a.sort_order - b.sort_order);
   const visibleSteps = showInactive ? sortedSteps : sortedSteps.filter((s) => s.is_active !== 0);
   const activeCount = steps.filter((s) => s.is_active !== 0).length;
+
+  const stepRowProps = (step, i) => ({
+    step,
+    index: i,
+    totalVisible: visibleSteps.length,
+    canEdit,
+    selected: selected.has(step.id),
+    editingStepId: editingStep?.id,
+    onToggleSelect: () => toggleSelect(step.id),
+    onMoveStep: moveStep,
+    onEdit: setEditingStep,
+    onDuplicate: handleDuplicate,
+    onDelete: handleDelete,
+    onRestore: handleRestore,
+    onSave: handleSave,
+    onCancelEdit: () => setEditingStep(null),
+  });
 
   return (
     <div>
@@ -186,120 +381,33 @@ export default function StepsTab({ api, role = 'viewer', termId }) {
             className="rounded"
           />
           <span className="font-body text-xs text-csub-gray">Select all</span>
+          {canEdit && (
+            <span className="font-body text-[10px] text-csub-gray/60 ml-2">
+              Drag the grip handle to reorder
+            </span>
+          )}
         </div>
       )}
 
-      <div className="space-y-2">
-        {visibleSteps.map((step, i) => (
-          <div key={step.id}>
-            <div
-              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border shadow-sm transition-all hover:shadow-md ${
-                step.is_active === 0
-                  ? 'border-gray-200 bg-gray-50 opacity-60'
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              {canEdit && (
-                <input
-                  type="checkbox"
-                  checked={selected.has(step.id)}
-                  onChange={() => toggleSelect(step.id)}
-                  className="rounded flex-shrink-0"
-                />
-              )}
-
-              {/* Reorder buttons */}
-              {canEdit && (
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    onClick={() => moveStep(i, -1)}
-                    disabled={i === 0}
-                    className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
-                    title="Move up"
-                  >
-                    ▲
-                  </button>
-                  <button
-                    onClick={() => moveStep(i, 1)}
-                    disabled={i === visibleSteps.length - 1}
-                    className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
-                    title="Move down"
-                  >
-                    ▼
-                  </button>
-                </div>
-              )}
-
-              {/* Icon in container */}
-              <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
-                {step.icon || '📋'}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="font-body text-sm font-semibold text-csub-blue-dark truncate">
-                  {step.title}
-                  {step.is_public === 1 && (
-                    <span className="ml-2 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-body font-medium align-middle">
-                      Public
-                    </span>
-                  )}
-                </p>
-                <p className="font-body text-xs text-csub-gray truncate">
-                  {step.description || 'No description'}
-                  {step.deadline && <span className="text-amber-600 ml-1">— {step.deadline}</span>}
-                </p>
-                {step.required_tags && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(typeof step.required_tags === 'string' ? JSON.parse(step.required_tags) : step.required_tags).map((tag) => (
-                      <span key={tag} className="text-[10px] bg-csub-blue/10 text-csub-blue-dark px-1.5 py-0.5 rounded-full font-body">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {canEdit && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => setEditingStep(step)}
-                    className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDuplicate(step.id)}
-                    className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
-                  >
-                    Duplicate
-                  </button>
-                  {step.is_active === 0 ? (
-                    <button
-                      onClick={() => handleRestore(step.id)}
-                      className="font-body text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50 transition-colors"
-                    >
-                      Restore
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleDelete(step.id)}
-                      className="font-body text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {canEdit && editingStep?.id === step.id && (
-              <div className="mt-2 mb-4">
-                <StepForm step={step} onSave={handleSave} onCancel={() => setEditingStep(null)} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Step list — draggable when canEdit */}
+      {canEdit ? (
+        <Reorder.Group
+          axis="y"
+          values={visibleSteps}
+          onReorder={handleDragReorder}
+          className="space-y-2"
+        >
+          {visibleSteps.map((step, i) => (
+            <DraggableStepRow key={step.id} {...stepRowProps(step, i)} />
+          ))}
+        </Reorder.Group>
+      ) : (
+        <div className="space-y-2">
+          {visibleSteps.map((step, i) => (
+            <DraggableStepRow key={step.id} {...stepRowProps(step, i)} />
+          ))}
+        </div>
+      )}
 
       {visibleSteps.length === 0 && (
         <p className="font-body text-sm text-csub-gray text-center py-8">No steps yet. Create one above.</p>
