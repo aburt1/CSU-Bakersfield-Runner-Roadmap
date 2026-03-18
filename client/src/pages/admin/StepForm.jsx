@@ -6,6 +6,7 @@ export default function StepForm({ step, onSave, onCancel }) {
   const [icon, setIcon] = useState(step?.icon || '');
   const [description, setDescription] = useState(step?.description || '');
   const [deadline, setDeadline] = useState(step?.deadline || '');
+  const [deadlineDate, setDeadlineDate] = useState(step?.deadline_date || '');
   const [guideContent, setGuideContent] = useState(step?.guide_content || '');
   const [linksText, setLinksText] = useState(
     step?.links ? (typeof step.links === 'string' ? step.links : JSON.stringify(step.links, null, 2)) : ''
@@ -16,6 +17,7 @@ export default function StepForm({ step, onSave, onCancel }) {
       : []
   );
   const [sortOrder, setSortOrder] = useState(step?.sort_order ?? '');
+  const [isPublic, setIsPublic] = useState(step?.is_public === 1);
 
   const existingContact = step?.contact_info
     ? (typeof step.contact_info === 'string' ? JSON.parse(step.contact_info) : step.contact_info)
@@ -45,11 +47,13 @@ export default function StepForm({ step, onSave, onCancel }) {
       icon: icon || null,
       description: description || null,
       deadline: deadline || null,
+      deadline_date: deadlineDate || null,
       guide_content: guideContent || null,
       links: parsedLinks,
       required_tags: requiredTags.length > 0 ? requiredTags : null,
       sort_order: sortOrder !== '' ? parseInt(sortOrder, 10) : undefined,
       contact_info: contactInfo,
+      is_public: isPublic ? 1 : 0,
     });
   };
 
@@ -74,16 +78,30 @@ export default function StepForm({ step, onSave, onCancel }) {
         <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className={field} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className={label}>Deadline</label>
-          <input type="text" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={field} placeholder="e.g. May 1, 2026" />
+          <label className={label}>Deadline (display text)</label>
+          <input type="text" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={field} placeholder="e.g. May 1" />
+        </div>
+        <div>
+          <label className={label}>Deadline Date (for countdown)</label>
+          <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className={field} />
         </div>
         <div>
           <label className={label}>Sort Order</label>
           <input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={field} />
         </div>
       </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isPublic}
+          onChange={(e) => setIsPublic(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-csub-blue focus:ring-csub-blue"
+        />
+        <span className="font-body text-sm text-csub-blue-dark">Visible without login (public preview)</span>
+      </label>
 
       <div>
         <label className={label}>Guide Content (detailed instructions)</label>

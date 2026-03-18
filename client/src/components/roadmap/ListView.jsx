@@ -1,3 +1,5 @@
+import DeadlineCountdown from './DeadlineCountdown';
+
 const STATUS_CONFIG = {
   completed: {
     badgeClass: 'bg-emerald-50 text-emerald-700',
@@ -68,6 +70,7 @@ export default function ListView({ steps, completedDates, onSelectStep }) {
                     {step.deadline}
                   </span>
                 )}
+                <DeadlineCountdown deadlineDate={step.deadline_date} status={step.status} />
                 <span className={`text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${config.badgeClass}`}>
                   {config.badgeLabel}
                 </span>

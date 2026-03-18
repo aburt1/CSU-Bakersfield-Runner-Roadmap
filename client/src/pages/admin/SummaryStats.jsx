@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 
-export default function SummaryStats({ api }) {
+export default function SummaryStats({ api, termId }) {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    api.get('/stats').then(setStats).catch(() => {});
-  }, [api]);
+    const query = termId ? `/stats?term_id=${termId}` : '/stats';
+    api.get(query).then(setStats).catch(() => {});
+  }, [api, termId]);
 
   if (!stats) return null;
 

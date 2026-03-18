@@ -10,6 +10,7 @@ import StepDetailPanel from '../components/roadmap/StepDetailPanel';
 import HelpSection from '../components/roadmap/HelpSection';
 import CompletionBanner from '../components/roadmap/CompletionBanner';
 import Celebration from '../components/Celebration';
+import HighContrastToggle from '../components/HighContrastToggle';
 
 export default function RoadmapPage() {
   const { user, logout } = useAuth();
@@ -23,6 +24,7 @@ export default function RoadmapPage() {
     percentage,
     currentStep,
     allComplete,
+    term,
     retry,
   } = useProgress();
 
@@ -122,7 +124,7 @@ export default function RoadmapPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="font-body text-csub-gold text-sm font-semibold tracking-wide mb-1">
-                Fall 2026 Admissions
+                {term?.name || 'Admissions'}
               </p>
               <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold uppercase tracking-wide">
                 Welcome, {firstName}
@@ -131,6 +133,7 @@ export default function RoadmapPage() {
                 Your step-by-step guide to becoming a Roadrunner
               </p>
             </div>
+            <HighContrastToggle />
             <button
               onClick={logout}
               className="font-body text-sm text-white/60 hover:text-white transition-colors flex-shrink-0 mt-1"
@@ -151,7 +154,7 @@ export default function RoadmapPage() {
         allComplete={allComplete}
       />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
+      <main id="main-content" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
         {/* ===== F. Completion Banner ===== */}
         {allComplete && <CompletionBanner firstName={firstName} />}
 

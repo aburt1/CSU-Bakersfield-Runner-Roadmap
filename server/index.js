@@ -9,6 +9,7 @@ import { initDatabase } from './db/init.js';
 import stepsRouter from './routes/steps.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
+import adminAuthRouter from './routes/adminAuth.js';
 
 dotenv.config();
 
@@ -39,33 +40,36 @@ app.use('/api/', limiter);
 // Body parsing
 app.use(express.json());
 
-// Initialize database
-const db = initDatabase();
+// Initialize database and start server
+(async () => {
+  const db = await initDatabase();
 
-// Make db available to routes
-app.use((req, res, next) => {
-  req.db = db;
-  next();
-});
-
-// API routes
-app.use('/api/auth', authRouter);
-app.use('/api/steps', stepsRouter);
-app.use('/api/admin', adminRouter);
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(join(__dirname, '../client/dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(join(__dirname, '../client/dist/index.html'));
+  // Make db available to routes
+  app.use((req, res, next) => {
+    req.db = db;
+    next();
   });
-}
 
-app.listen(PORT, () => {
-  console.log(`CSUB Admissions API running on port ${PORT}`);
-});
+  // API routes
+  app.use('/api/auth', authRouter);
+  app.use('/api/steps', stepsRouter);
+  app.use('/api/admin/auth', adminAuthRouter);
+  app.use('/api/admin', adminRouter);
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Serve static files in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(join(__dirname, '../client/dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(join(__dirname, '../client/dist/index.html'));
+    });
+  }
+
+  app.listen(PORT, () => {
+    console.log(`CSUB Admissions API running on port ${PORT}`);
+  });
+})();

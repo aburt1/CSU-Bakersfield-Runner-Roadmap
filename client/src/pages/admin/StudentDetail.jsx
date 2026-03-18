@@ -3,7 +3,8 @@ import TagEditor from './TagEditor';
 import StepToggle from './StepToggle';
 import AuditTimeline from './AuditTimeline';
 
-export default function StudentDetail({ student, steps, api, onProgressChange }) {
+export default function StudentDetail({ student, steps, api, role = 'viewer', onProgressChange }) {
+  const canEdit = role === 'admissions' || role === 'admissions_editor' || role === 'sysadmin';
   const [progress, setProgress] = useState(new Map()); // stepId -> { completed_at, status, note }
   const [studentTags, setStudentTags] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -100,10 +101,12 @@ export default function StudentDetail({ student, steps, api, onProgressChange })
       </div>
 
       {/* Tags */}
-      <div className="mb-5">
-        <label className="font-body text-xs font-semibold text-csub-blue-dark block mb-1">Student Tags</label>
-        <TagEditor tags={studentTags} onChange={saveTags} />
-      </div>
+      {canEdit && (
+        <div className="mb-5">
+          <label className="font-body text-xs font-semibold text-csub-blue-dark block mb-1">Student Tags</label>
+          <TagEditor tags={studentTags} onChange={saveTags} />
+        </div>
+      )}
 
       {/* Progress bar */}
       <div className="mb-5">
@@ -148,6 +151,7 @@ export default function StudentDetail({ student, steps, api, onProgressChange })
               note={prog?.note || null}
               api={api}
               onToggle={handleStepToggle}
+              readOnly={!canEdit}
             />
           );
         })}

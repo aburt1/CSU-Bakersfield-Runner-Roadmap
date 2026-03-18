@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import SummaryStats from './SummaryStats';
 import StudentDetail from './StudentDetail';
 
-export default function StudentsTab({ api, steps }) {
+export default function StudentsTab({ api, steps, role = 'viewer', termId }) {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -20,7 +20,8 @@ export default function StudentsTab({ api, steps }) {
     }
     setSearchLoading(true);
     try {
-      const data = await api.get(`/students?search=${encodeURIComponent(query)}`);
+      const termParam = termId ? `&term_id=${termId}` : '';
+      const data = await api.get(`/students?search=${encodeURIComponent(query)}${termParam}`);
       setStudents(data);
     } catch {
       // ignore
@@ -40,7 +41,7 @@ export default function StudentsTab({ api, steps }) {
 
   return (
     <div>
-      <SummaryStats api={api} />
+      <SummaryStats api={api} termId={termId} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left: Search */}
@@ -103,9 +104,16 @@ export default function StudentsTab({ api, steps }) {
                       <p className="font-body text-sm font-semibold text-csub-blue-dark">{s.display_name}</p>
                       <p className="font-body text-xs text-csub-gray">{s.email}</p>
                     </div>
-                    <span className="font-body text-xs text-csub-gray flex-shrink-0">
-                      {s.completed_steps}/{totalActiveSteps}
-                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {s.overdue_step_count > 0 && (
+                        <span className="inline-flex items-center text-[10px] font-body font-semibold text-red-600 bg-red-50 rounded-full px-1.5 py-0.5">
+                          {s.overdue_step_count} overdue
+                        </span>
+                      )}
+                      <span className="font-body text-xs text-csub-gray">
+                        {s.completed_steps}/{totalActiveSteps}
+                      </span>
+                    </div>
                   </div>
                   {/* Mini progress bar */}
                   <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
@@ -131,6 +139,7 @@ export default function StudentsTab({ api, steps }) {
             student={selectedStudent}
             steps={steps}
             api={api}
+            role={role}
             onProgressChange={refreshSearch}
           />
         </div>

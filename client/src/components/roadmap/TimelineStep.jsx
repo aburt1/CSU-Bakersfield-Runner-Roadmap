@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import DeadlineCountdown from './DeadlineCountdown';
 
 const STATUS_CONFIG = {
   completed: {
@@ -84,9 +85,10 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
 
       {/* Card */}
       <button
-        onClick={onSelect}
+        onClick={step.status === 'locked' ? undefined : onSelect}
+        disabled={step.status === 'locked'}
         className={`w-full text-left rounded-xl border p-4 sm:p-5 transition-all duration-200 group
-          hover:shadow-md focus:outline-none focus:ring-2 focus:ring-csub-blue focus:ring-offset-2
+          ${step.status === 'locked' ? 'cursor-default' : 'hover:shadow-md focus:outline-none focus:ring-2 focus:ring-csub-blue focus:ring-offset-2'}
           ${config.cardClass}
           ${isActive ? 'ring-1 ring-csub-blue/20' : ''}
         `}
@@ -143,6 +145,9 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
                   {step.deadline}
                 </span>
               )}
+
+              {/* Deadline countdown */}
+              <DeadlineCountdown deadlineDate={step.deadline_date} status={step.status} />
 
               {/* Completed date */}
               {step.status === 'completed' && completedAt && (

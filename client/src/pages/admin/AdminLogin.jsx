@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
 export default function AdminLogin({ onLogin }) {
-  const [apiKey, setApiKey] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -10,15 +11,16 @@ export default function AdminLogin({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/students?search=__test__', {
-        headers: { 'X-Api-Key': apiKey },
+      const res = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
-      if (res.ok) {
-        onLogin(apiKey);
-      } else if (res.status === 403 || res.status === 401) {
-        setError('Invalid API key.');
+      const data = await res.json();
+      if (res.ok && data.token) {
+        onLogin(data.token, data.user);
       } else {
-        setError('Server error. Try again.');
+        setError(data.error || 'Invalid credentials.');
       }
     } catch {
       setError('Cannot connect to server.');
@@ -34,15 +36,25 @@ export default function AdminLogin({ onLogin }) {
           Admin Portal
         </h1>
         <p className="font-body text-csub-gray text-sm mb-6 text-center">
-          Enter your admin API key to continue.
+          Sign in with your admin credentials.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            autoComplete="email"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
+          />
+          <input
             type="password"
             required
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="API Key"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoComplete="current-password"
             className="w-full px-4 py-3 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
           />
           {error && <p className="text-red-600 text-sm font-body">{error}</p>}
@@ -51,7 +63,7 @@ export default function AdminLogin({ onLogin }) {
             disabled={loading}
             className="w-full bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-6 py-3 rounded-lg shadow transition-colors duration-200 disabled:opacity-50"
           >
-            {loading ? 'Verifying...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
       </div>

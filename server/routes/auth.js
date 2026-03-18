@@ -18,10 +18,13 @@ router.post('/dev-login', (req, res) => {
 
   if (!student) {
     const studentId = uuidv4();
+    // Assign to the active term
+    const activeTerm = req.db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id DESC LIMIT 1').get();
+    const termId = activeTerm?.id || null;
     req.db.prepare(`
-      INSERT INTO students (id, display_name, email)
-      VALUES (?, ?, ?)
-    `).run(studentId, name, email);
+      INSERT INTO students (id, display_name, email, term_id)
+      VALUES (?, ?, ?, ?)
+    `).run(studentId, name, email, termId);
 
     // Auto-complete step 1 (Accepted!) for new students
     req.db.prepare(`

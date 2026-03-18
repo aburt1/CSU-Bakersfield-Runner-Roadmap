@@ -48,6 +48,7 @@ export function useProgress() {
   const [progressMap, setProgressMap] = useState(new Map());
   const [completedDates, setCompletedDates] = useState({});
   const [studentTags, setStudentTags] = useState([]);
+  const [term, setTerm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
@@ -89,6 +90,7 @@ export function useProgress() {
           Object.fromEntries(data.progress.map((p) => [p.step_id, p.completed_at]))
         );
         setStudentTags(data.tags || []);
+        if (data.term) setTerm(data.term);
         setError(null);
       }
     } catch {
@@ -133,6 +135,7 @@ export function useProgress() {
     steps: enrichedSteps,
     completedDates,
     studentTags,
+    term,
     loading,
     error,
     totalSteps,

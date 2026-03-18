@@ -38,16 +38,18 @@ export default function ProgressSummary({ completedCount, totalSteps, percentage
         </div>
 
         {/* Current step hint */}
-        {currentStepTitle && !allComplete && (
-          <p className="font-body text-xs text-csub-gray mt-1.5">
-            Next up: <span className="font-semibold text-csub-blue-dark">{currentStepTitle}</span>
-          </p>
-        )}
-        {allComplete && (
-          <p className="font-body text-xs text-csub-blue font-semibold mt-1.5">
-            All steps completed — you're all set!
-          </p>
-        )}
+        <div aria-live="polite" aria-atomic="true">
+          {currentStepTitle && !allComplete && (
+            <p className="font-body text-xs text-csub-gray mt-1.5">
+              Next up: <span className="font-semibold text-csub-blue-dark">{currentStepTitle}</span>
+            </p>
+          )}
+          {allComplete && (
+            <p className="font-body text-xs text-csub-blue font-semibold mt-1.5">
+              All steps completed — you're all set!
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

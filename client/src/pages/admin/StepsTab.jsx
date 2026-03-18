@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import StepForm from './StepForm';
 
-export default function StepsTab({ api }) {
+export default function StepsTab({ api, role = 'viewer', termId }) {
+  const canEdit = role === 'admissions_editor' || role === 'sysadmin';
   const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingStep, setEditingStep] = useState(null);
@@ -10,7 +11,8 @@ export default function StepsTab({ api }) {
 
   const fetchSteps = useCallback(async () => {
     try {
-      const data = await api.get('/steps');
+      const query = termId ? `/steps?term_id=${termId}` : '/steps';
+      const data = await api.get(query);
       setSteps(data);
     } catch {
       // ignore
@@ -127,20 +129,22 @@ export default function StepsTab({ api }) {
             />
             Show inactive
           </label>
-          <button
-            onClick={() => setEditingStep({})}
-            className="flex items-center gap-1.5 bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            New Step
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setEditingStep({})}
+              className="flex items-center gap-1.5 bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition-colors text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              New Step
+            </button>
+          )}
         </div>
       </div>
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
+      {canEdit && selected.size > 0 && (
         <div className="flex items-center gap-3 mb-4 bg-csub-blue/5 border border-csub-blue/20 rounded-xl px-4 py-2.5">
           <span className="font-body text-sm text-csub-blue-dark font-semibold">
             {selected.size} selected
@@ -166,14 +170,14 @@ export default function StepsTab({ api }) {
         </div>
       )}
 
-      {editingStep && !editingStep.id && (
+      {canEdit && editingStep && !editingStep.id && (
         <div className="mb-6">
           <StepForm step={null} onSave={handleSave} onCancel={() => setEditingStep(null)} />
         </div>
       )}
 
       {/* Select all */}
-      {visibleSteps.length > 0 && (
+      {canEdit && visibleSteps.length > 0 && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <input
             type="checkbox"
@@ -195,32 +199,36 @@ export default function StepsTab({ api }) {
                   : 'border-gray-200 bg-white'
               }`}
             >
-              <input
-                type="checkbox"
-                checked={selected.has(step.id)}
-                onChange={() => toggleSelect(step.id)}
-                className="rounded flex-shrink-0"
-              />
+              {canEdit && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(step.id)}
+                  onChange={() => toggleSelect(step.id)}
+                  className="rounded flex-shrink-0"
+                />
+              )}
 
               {/* Reorder buttons */}
-              <div className="flex flex-col gap-0.5">
-                <button
-                  onClick={() => moveStep(i, -1)}
-                  disabled={i === 0}
-                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
-                  title="Move up"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => moveStep(i, 1)}
-                  disabled={i === visibleSteps.length - 1}
-                  className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
-                  title="Move down"
-                >
-                  ▼
-                </button>
-              </div>
+              {canEdit && (
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    onClick={() => moveStep(i, -1)}
+                    disabled={i === 0}
+                    className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
+                    title="Move up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveStep(i, 1)}
+                    disabled={i === visibleSteps.length - 1}
+                    className="text-xs text-csub-gray hover:text-csub-blue disabled:opacity-30 transition-colors"
+                    title="Move down"
+                  >
+                    ▼
+                  </button>
+                </div>
+              )}
 
               {/* Icon in container */}
               <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
@@ -228,7 +236,14 @@ export default function StepsTab({ api }) {
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="font-body text-sm font-semibold text-csub-blue-dark truncate">{step.title}</p>
+                <p className="font-body text-sm font-semibold text-csub-blue-dark truncate">
+                  {step.title}
+                  {step.is_public === 1 && (
+                    <span className="ml-2 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-body font-medium align-middle">
+                      Public
+                    </span>
+                  )}
+                </p>
                 <p className="font-body text-xs text-csub-gray truncate">
                   {step.description || 'No description'}
                   {step.deadline && <span className="text-amber-600 ml-1">— {step.deadline}</span>}
@@ -244,38 +259,40 @@ export default function StepsTab({ api }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => setEditingStep(step)}
-                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDuplicate(step.id)}
-                  className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
-                >
-                  Duplicate
-                </button>
-                {step.is_active === 0 ? (
+              {canEdit && (
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
-                    onClick={() => handleRestore(step.id)}
-                    className="font-body text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                    onClick={() => setEditingStep(step)}
+                    className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
                   >
-                    Restore
+                    Edit
                   </button>
-                ) : (
                   <button
-                    onClick={() => handleDelete(step.id)}
-                    className="font-body text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                    onClick={() => handleDuplicate(step.id)}
+                    className="font-body text-xs text-csub-blue hover:text-csub-blue-dark px-2 py-1 rounded hover:bg-csub-blue/5 transition-colors"
                   >
-                    Delete
+                    Duplicate
                   </button>
-                )}
-              </div>
+                  {step.is_active === 0 ? (
+                    <button
+                      onClick={() => handleRestore(step.id)}
+                      className="font-body text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                    >
+                      Restore
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleDelete(step.id)}
+                      className="font-body text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {editingStep?.id === step.id && (
+            {canEdit && editingStep?.id === step.id && (
               <div className="mt-2 mb-4">
                 <StepForm step={step} onSave={handleSave} onCancel={() => setEditingStep(null)} />
               </div>

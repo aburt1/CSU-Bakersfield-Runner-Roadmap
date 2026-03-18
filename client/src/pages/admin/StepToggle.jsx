@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import NoteModal from './NoteModal';
 
-export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, status, completedAt, note: savedNote, api, onToggle }) {
+export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, status, completedAt, note: savedNote, api, onToggle, readOnly = false }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(null); // null | 'complete' | 'waive' | 'uncomplete'
 
@@ -83,7 +83,7 @@ export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, sta
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          {!readOnly && <div className="flex items-center gap-1 flex-shrink-0">
             {isDone ? (
               <button
                 onClick={() => setShowModal('uncomplete')}
@@ -110,7 +110,7 @@ export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, sta
                 </button>
               </>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
