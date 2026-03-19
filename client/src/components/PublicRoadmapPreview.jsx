@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import TimelineStep from './roadmap/TimelineStep';
+import StepDetailPanel from './roadmap/StepDetailPanel';
 import HelpSection from './roadmap/HelpSection';
 
 export default function PublicRoadmapPreview({ onLogin }) {
@@ -11,6 +12,7 @@ export default function PublicRoadmapPreview({ onLogin }) {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+  const [selectedStep, setSelectedStep] = useState(null);
 
   useEffect(() => {
     fetch('/api/steps')
@@ -152,7 +154,7 @@ export default function PublicRoadmapPreview({ onLogin }) {
                     step={{ ...step, status: 'preview' }}
                     index={i}
                     isLast={false}
-                    onSelect={() => {}}
+                    onSelect={() => setSelectedStep(step)}
                   />
                 ))}
               </ol>
@@ -195,6 +197,25 @@ export default function PublicRoadmapPreview({ onLogin }) {
         {/* Help footer — same as authenticated roadmap */}
         <HelpSection />
       </main>
+
+      {/* Step Detail Panel — public steps only */}
+      <AnimatePresence>
+        {selectedStep && (
+          <StepDetailPanel
+            step={{ ...selectedStep, status: 'preview' }}
+            stepNumber={publicSteps.findIndex((s) => s.id === selectedStep.id) + 1}
+            totalSteps={publicSteps.length}
+            onClose={() => setSelectedStep(null)}
+            onNavigate={(direction) => {
+              const idx = publicSteps.findIndex((s) => s.id === selectedStep.id);
+              const next = direction === 'next' ? publicSteps[idx + 1] : publicSteps[idx - 1];
+              if (next) setSelectedStep(next);
+            }}
+            hasPrev={publicSteps.findIndex((s) => s.id === selectedStep.id) > 0}
+            hasNext={publicSteps.findIndex((s) => s.id === selectedStep.id) < publicSteps.length - 1}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

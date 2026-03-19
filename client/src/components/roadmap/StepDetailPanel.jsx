@@ -117,12 +117,14 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
                 {step.title}
               </h2>
               <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                <span className={`inline-flex items-center gap-1 text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${statusConfig.class}`}>
-                  {step.status === 'in_progress' && (
-                    <span className="w-1.5 h-1.5 bg-csub-blue rounded-full animate-pulse" aria-hidden="true" />
-                  )}
-                  {statusConfig.label}
-                </span>
+                {step.status !== 'preview' && (
+                  <span className={`inline-flex items-center gap-1 text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${statusConfig.class}`}>
+                    {step.status === 'in_progress' && (
+                      <span className="w-1.5 h-1.5 bg-csub-blue rounded-full animate-pulse" aria-hidden="true" />
+                    )}
+                    {statusConfig.label}
+                  </span>
+                )}
                 {step.deadline && (
                   <span className="text-xs font-body font-medium text-amber-700 bg-amber-50 rounded-full px-2.5 py-0.5">
                     {step.deadline}
@@ -159,7 +161,7 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
               </h3>
               {isHtmlContent ? (
                 <div
-                  className="prose prose-sm max-w-none font-body text-sm text-csub-gray leading-relaxed"
+                  className="prose prose-sm max-w-none font-body prose-headings:font-display prose-headings:text-csub-blue-dark prose-headings:uppercase prose-headings:tracking-wide prose-a:text-csub-blue prose-a:font-semibold prose-p:text-csub-gray prose-li:text-csub-gray prose-blockquote:text-csub-gray prose-strong:text-csub-blue-dark"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(step.guide_content) }}
                 />
               ) : (
