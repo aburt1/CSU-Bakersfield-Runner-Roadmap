@@ -118,6 +118,11 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
                 }`}>
                   {step.title}
                 </h3>
+                {step.is_optional === 1 && (
+                  <span className="inline-flex mt-1 text-[10px] font-body font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2 py-0.5">
+                    Optional
+                  </span>
+                )}
               </div>
 
               {/* View details arrow */}

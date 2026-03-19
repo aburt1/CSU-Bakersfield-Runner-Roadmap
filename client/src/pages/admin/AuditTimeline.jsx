@@ -2,6 +2,8 @@ const ACTION_META = {
   complete: { label: 'Step completed', color: 'bg-green-500' },
   waive: { label: 'Step waived', color: 'bg-amber-500' },
   uncomplete: { label: 'Step marked incomplete', color: 'bg-red-400' },
+  student_optional_complete: { label: 'Optional step completed by student', color: 'bg-green-600' },
+  student_optional_uncomplete: { label: 'Optional step marked incomplete by student', color: 'bg-orange-500' },
   tags_update: { label: 'Tags updated', color: 'bg-indigo-500' },
   step_create: { label: 'Step created', color: 'bg-csub-blue' },
   step_update: { label: 'Step updated', color: 'bg-sky-600' },
@@ -58,6 +60,8 @@ function getSummary(log, details) {
     case 'complete':
     case 'waive':
     case 'uncomplete':
+    case 'student_optional_complete':
+    case 'student_optional_uncomplete':
       return `${fallback}${details.stepTitle ? `: ${details.stepTitle}` : ''}${details.studentName ? ` for ${details.studentName}` : ''}`;
     case 'tags_update':
       return `Updated tags${details.studentName ? ` for ${details.studentName}` : ''}`;
@@ -86,7 +90,9 @@ function getDetailRows(log, details) {
 
   if (details.studentName) rows.push(['Student', details.studentName]);
   if (details.emplid) rows.push(['Student ID #', details.emplid]);
+  if (details.student_id_number) rows.push(['Student ID #', details.student_id_number]);
   if (details.stepTitle) rows.push(['Step', details.stepTitle]);
+  if (details.step_key) rows.push(['Step Key', details.step_key]);
   if (details.title && !details.stepTitle) rows.push(['Title', details.title]);
   if (details.name) rows.push(['Term', details.name]);
   if (details.email) rows.push(['Email', details.email]);

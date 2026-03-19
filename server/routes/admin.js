@@ -41,6 +41,7 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
     contact_info,
     term_id,
     is_public,
+    is_optional,
     step_key,
   } = req.body;
 
@@ -67,8 +68,8 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
   const order = sort_order ?? (maxOrder.max || 0) + 1;
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public, is_optional)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
     title,
     description || null,
@@ -84,7 +85,8 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
     contact_info ? JSON.stringify(contact_info) : null,
     termId,
     nextStepKey,
-    is_public ? 1 : 0
+    is_public ? 1 : 0,
+    is_optional ? 1 : 0
   );
 
   logAudit(req.db, req, {
@@ -161,7 +163,7 @@ router.put('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, res
     return res.status(400).json({ error: 'Invalid term_id' });
   }
 
-  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'deadline_date', 'guide_content', 'links', 'required_tags', 'required_tag_mode', 'excluded_tags', 'contact_info', 'term_id', 'is_active', 'is_public'];
+  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'deadline_date', 'guide_content', 'links', 'required_tags', 'required_tag_mode', 'excluded_tags', 'contact_info', 'term_id', 'is_active', 'is_public', 'is_optional'];
   const updates = [];
   const values = [];
 
@@ -245,8 +247,8 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
   });
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public, is_optional)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
     step.title + ' (Copy)',
     step.description,
@@ -262,7 +264,8 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
     step.contact_info,
     step.term_id,
     duplicatedStepKey,
-    step.is_public || 0
+    step.is_public || 0,
+    step.is_optional || 0
   );
 
   logAudit(req.db, req, {
@@ -506,13 +509,14 @@ router.get('/students', (req, res) => {
     FROM students s
     LEFT JOIN (
       SELECT student_id, COUNT(*) as completed
-      FROM student_progress
+      FROM student_progress sp
+      JOIN steps st_req ON st_req.id = sp.step_id AND COALESCE(st_req.is_optional, 0) = 0
       GROUP BY student_id
     ) pc ON pc.student_id = s.id
     LEFT JOIN (
       SELECT s2.id as student_id, COUNT(st.id) as overdue_count
       FROM students s2
-      JOIN steps st ON st.is_active = 1 AND st.deadline_date IS NOT NULL AND st.deadline_date < date('now')
+      JOIN steps st ON st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 AND st.deadline_date IS NOT NULL AND st.deadline_date < date('now')
         AND (st.term_id = s2.term_id OR st.term_id IS NULL)
       LEFT JOIN student_progress sp ON sp.student_id = s2.id AND sp.step_id = st.id
       WHERE sp.student_id IS NULL
@@ -612,7 +616,7 @@ router.get('/audit', (req, res) => {
 // GET /api/admin/stats — optional ?term_id=
 router.get('/stats', (req, res) => {
   const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
-  const stepFilter = termId ? 'WHERE is_active = 1 AND term_id = ?' : 'WHERE is_active = 1';
+  const stepFilter = termId ? 'WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = ?' : 'WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0';
   const studentFilter = termId ? 'WHERE term_id = ?' : '';
   const stepParams = termId ? [termId] : [];
   const studentParams = termId ? [termId] : [];
@@ -626,7 +630,7 @@ router.get('/stats', (req, res) => {
        LEFT JOIN (
          SELECT student_id, COUNT(*) as completed
          FROM student_progress sp
-         JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND st.term_id = ?
+         JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 AND st.term_id = ?
          GROUP BY student_id
        ) pc ON pc.student_id = s.id
        WHERE s.term_id = ?`
@@ -635,7 +639,7 @@ router.get('/stats', (req, res) => {
        LEFT JOIN (
          SELECT student_id, COUNT(*) as completed
          FROM student_progress sp
-         JOIN steps st ON st.id = sp.step_id AND st.is_active = 1
+         JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0
          GROUP BY student_id
        ) pc ON pc.student_id = s.id`;
 
@@ -658,7 +662,7 @@ router.get('/stats', (req, res) => {
 router.get('/export/progress', (req, res) => {
   const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
   const studentFilter = termId ? 'WHERE term_id = ?' : '';
-  const stepFilter = termId ? 'WHERE is_active = 1 AND term_id = ?' : 'WHERE is_active = 1';
+  const stepFilter = termId ? 'WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = ?' : 'WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0';
   const studentParams = termId ? [termId] : [];
   const stepParams = termId ? [termId] : [];
 
@@ -720,7 +724,7 @@ router.get('/analytics/step-completion', (req, res) => {
       COUNT(DISTINCT sp.student_id) as completed_count
     FROM steps s
     LEFT JOIN student_progress sp ON sp.step_id = s.id
-    WHERE s.is_active = 1 ${termFilter}
+    WHERE s.is_active = 1 AND COALESCE(s.is_optional, 0) = 0 ${termFilter}
     GROUP BY s.id
     ORDER BY s.sort_order
   `).all(...params);
@@ -732,7 +736,7 @@ router.get('/analytics/step-completion', (req, res) => {
 router.get('/analytics/completion-trend', (req, res) => {
   const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
   const days = parseInt(req.query.days, 10) || 30;
-  const termFilter = termId ? 'JOIN steps st ON st.id = sp.step_id AND st.term_id = ?' : '';
+  const termFilter = termId ? 'JOIN steps st ON st.id = sp.step_id AND st.term_id = ? AND COALESCE(st.is_optional, 0) = 0' : 'JOIN steps st ON st.id = sp.step_id AND COALESCE(st.is_optional, 0) = 0';
   const params = termId ? [termId, days] : [days];
 
   const rows = req.db.prepare(`
@@ -762,7 +766,7 @@ router.get('/analytics/bottlenecks', (req, res) => {
       COUNT(DISTINCT sp.student_id) as completed_count
     FROM steps s
     LEFT JOIN student_progress sp ON sp.step_id = s.id
-    WHERE s.is_active = 1 ${termFilter}
+    WHERE s.is_active = 1 AND COALESCE(s.is_optional, 0) = 0 ${termFilter}
     GROUP BY s.id
     ORDER BY completed_count ASC
     LIMIT 5
@@ -786,7 +790,7 @@ router.get('/analytics/cohort-summary', (req, res) => {
   const params = termId ? [termId, termId] : [];
 
   const totalActiveSteps = req.db.prepare(
-    termId ? 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND term_id = ?' : 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1'
+    termId ? 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = ?' : 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0'
   ).get(...(termId ? [termId] : [])).count;
 
   const rows = req.db.prepare(`
@@ -803,7 +807,7 @@ router.get('/analytics/cohort-summary', (req, res) => {
     LEFT JOIN (
       SELECT student_id, COUNT(*) as done
       FROM student_progress sp
-      JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 ${stepFilter}
+      JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 ${stepFilter}
       GROUP BY student_id
     ) pc ON pc.student_id = s.id
     ${studentFilter}
@@ -919,8 +923,8 @@ router.post('/terms/:id/clone', requireRole('admissions_editor', 'sysadmin'), (r
 
     const newTermId = termResult.lastInsertRowid;
     const insertStep = req.db.prepare(`
-      INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public, is_optional)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const clonedSteps = sourceSteps.map((step) => {
@@ -940,7 +944,8 @@ router.post('/terms/:id/clone', requireRole('admissions_editor', 'sysadmin'), (r
         newTermId,
         step.step_key,
         step.is_active ?? 1,
-        step.is_public ?? 0
+        step.is_public ?? 0,
+        step.is_optional ?? 0
       );
 
       return req.db.prepare('SELECT * FROM steps WHERE id = ?').get(result.lastInsertRowid);
@@ -1016,7 +1021,7 @@ router.get('/students/overdue', (req, res) => {
     SELECT s.id, s.display_name, s.email,
       COUNT(st.id) as overdue_count
     FROM students s
-    JOIN steps st ON st.is_active = 1 AND st.deadline_date IS NOT NULL AND st.deadline_date < date('now') ${termFilter}
+    JOIN steps st ON st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 AND st.deadline_date IS NOT NULL AND st.deadline_date < date('now') ${termFilter}
     LEFT JOIN student_progress sp ON sp.student_id = s.id AND sp.step_id = st.id
     WHERE sp.student_id IS NULL ${studentTermFilter}
     GROUP BY s.id

@@ -10,7 +10,18 @@ const STATUS_LABELS = {
   locked: { label: 'Locked', class: 'bg-gray-100 text-gray-500' },
 };
 
-export default function StepDetailPanel({ step, stepNumber, totalSteps, completedAt, onClose, onNavigate, hasPrev, hasNext }) {
+export default function StepDetailPanel({
+  step,
+  stepNumber,
+  totalSteps,
+  completedAt,
+  onClose,
+  onNavigate,
+  hasPrev,
+  hasNext,
+  onOptionalStepStatusChange = null,
+  updatingOptionalStep = false,
+}) {
   const panelRef = useRef(null);
   const links = step.links ? (typeof step.links === 'string' ? JSON.parse(step.links) : step.links) : [];
   const isHtmlContent = step.guide_content && /<[a-z][\s\S]*>/i.test(step.guide_content);
@@ -128,6 +139,11 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
                 {step.deadline && (
                   <span className="text-xs font-body font-medium text-amber-700 bg-amber-50 rounded-full px-2.5 py-0.5">
                     {step.deadline}
+                  </span>
+                )}
+                {step.is_optional === 1 && (
+                  <span className="text-xs font-body font-medium text-csub-blue bg-csub-blue/10 rounded-full px-2.5 py-0.5">
+                    Optional
                   </span>
                 )}
                 {completedAt && (
@@ -254,6 +270,24 @@ export default function StepDetailPanel({ step, stepNumber, totalSteps, complete
 
         {/* Footer */}
         <div className="px-5 sm:px-6 pb-6 pt-2">
+          {onOptionalStepStatusChange && step.is_optional === 1 && step.status !== 'waived' && step.status !== 'locked' && step.status !== 'preview' && (
+            <button
+              onClick={() => onOptionalStepStatusChange(step.status === 'completed' ? 'not_completed' : 'completed')}
+              disabled={updatingOptionalStep}
+              className={`w-full font-display font-bold uppercase tracking-wider text-sm px-6 py-3.5 rounded-xl shadow transition-colors mb-3 ${
+                step.status === 'completed'
+                  ? 'bg-white border border-gray-300 text-csub-blue-dark hover:bg-gray-50'
+                  : 'bg-csub-blue hover:bg-csub-blue-dark text-white'
+              } disabled:opacity-50`}
+            >
+              {updatingOptionalStep
+                ? 'Saving...'
+                : step.status === 'completed'
+                  ? 'Mark Optional Step Incomplete'
+                  : 'Mark Optional Step Complete'}
+            </button>
+          )}
+
           {/* Primary action for in-progress */}
           {step.status === 'in_progress' && !isHtmlContent && links.length > 0 && (
             <a

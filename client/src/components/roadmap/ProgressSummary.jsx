@@ -1,6 +1,14 @@
 import { motion } from 'framer-motion';
 
-export default function ProgressSummary({ completedCount, totalSteps, percentage, currentStepTitle, allComplete }) {
+export default function ProgressSummary({
+  completedCount,
+  totalSteps,
+  percentage,
+  currentStepTitle,
+  allComplete,
+  optionalCompletedCount = 0,
+  optionalTotalSteps = 0,
+}) {
   return (
     <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
@@ -47,6 +55,11 @@ export default function ProgressSummary({ completedCount, totalSteps, percentage
           {allComplete && (
             <p className="font-body text-xs text-csub-blue font-semibold mt-1.5">
               All steps completed — you're all set!
+            </p>
+          )}
+          {optionalTotalSteps > 0 && (
+            <p className="font-body text-xs text-csub-gray mt-1">
+              Optional opportunities: <span className="font-semibold text-csub-blue-dark">{optionalCompletedCount}</span> of {optionalTotalSteps}
             </p>
           )}
         </div>

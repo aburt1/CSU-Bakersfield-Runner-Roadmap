@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import NoteModal from './NoteModal';
 
-export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, status, completedAt, note: savedNote, api, onToggle, readOnly = false }) {
+export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, status, completedAt, note: savedNote, api, onToggle, readOnly = false, isOptional = false }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(null); // null | 'complete' | 'waive' | 'uncomplete'
 
@@ -59,6 +59,11 @@ export default function StepToggle({ studentId, stepId, stepTitle, stepIcon, sta
               {stepTitle}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
+              {isOptional && (
+                <span className="inline-flex items-center text-[10px] font-body font-semibold text-csub-blue bg-csub-blue/10 rounded px-1.5 py-0.5">
+                  Optional
+                </span>
+              )}
               {status === 'completed' && (
                 <span className="inline-flex items-center text-[10px] font-body font-semibold text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5">
                   Completed

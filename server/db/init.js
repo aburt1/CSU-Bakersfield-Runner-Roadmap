@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { importFall2026Checklist } from '../utils/onboardingChecklistImport.js';
 import { ensureStepKeys } from '../utils/stepKeys.js';
 
 const DB_PATH = process.env.DB_PATH || './data/admissions.db';
@@ -82,6 +83,7 @@ export async function initDatabase() {
     'ALTER TABLE students ADD COLUMN term_id INTEGER',
     'ALTER TABLE steps ADD COLUMN is_public INTEGER DEFAULT 0',
     'ALTER TABLE steps ADD COLUMN step_key TEXT',
+    'ALTER TABLE steps ADD COLUMN is_optional INTEGER DEFAULT 0',
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -184,37 +186,15 @@ export async function initDatabase() {
     }
   }
 
-  // Seed default steps if empty
+  // Seed default Fall 2026 checklist if empty
   const count = db.prepare('SELECT COUNT(*) as count FROM steps').get();
   if (count.count === 0) {
-    // Get the default term id for seeding
     const defaultTerm = db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1').get();
     const seedTermId = defaultTerm?.id || null;
-
-    const insert = db.prepare(
-      'INSERT INTO steps (id, title, description, icon, sort_order, deadline, term_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    );
-
-    const steps = [
-      [1, 'Accepted!', 'Congratulations! You have been accepted to CSUB! This is the start of your Roadrunner journey.', '🎉', 1, null, seedTermId],
-      [2, 'Activate Your CSUB Account', 'Set up your myCSUB portal access and create your student login credentials.', '💻', 2, null, seedTermId],
-      [3, 'Submit Intent to Enroll', 'Confirm your spot at CSUB by submitting your Statement of Intent to Register.', '📋', 3, 'May 1', seedTermId],
-      [4, 'Sign Into Your CSUB Email', 'Access your official @csub.edu email account for important university communications.', '📧', 4, null, seedTermId],
-      [5, 'Register for Orientation', 'Sign up for a New Student Orientation session happening in May or June.', '📝', 5, 'May - June', seedTermId],
-      [6, 'Attend Orientation', 'Learn about campus resources, meet fellow Runners, and get ready for your first semester!', '🎓', 6, 'July - August', seedTermId],
-      [7, 'Meet with Your Advisor', 'Plan your first semester courses with your academic advisor.', '🤝', 7, null, seedTermId],
-      [8, 'Move into Campus Housing', 'Get settled into your new home on the CSUB campus!', '🏠', 8, 'August', seedTermId],
-      [9, 'First Day of Classes!', 'You made it! Welcome to CSUB, Runner! Time to hit the ground running!', '🏫', 9, null, seedTermId],
-    ];
-
-    const insertMany = db.transaction((rows) => {
-      for (const row of rows) insert.run(...row);
-    });
-
-    insertMany(steps);
-    // Mark first 2 steps as publicly visible (before login)
-    db.prepare('UPDATE steps SET is_public = 1 WHERE sort_order <= 2').run();
-    console.log('Seeded 9 admissions steps');
+    if (seedTermId) {
+      const importResult = importFall2026Checklist(db, seedTermId, { deactivateUnmatched: false });
+      console.log(`Seeded Fall 2026 onboarding checklist (${importResult.steps.length} steps)`);
+    }
   }
 
   ensureStepKeys(db);
@@ -246,7 +226,12 @@ export async function initDatabase() {
   if (studentCount.count === 0) {
     const defaultTerm = db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1').get();
     const termId = defaultTerm?.id || 1;
-    const stepRows = db.prepare('SELECT id, sort_order FROM steps WHERE term_id = ? ORDER BY sort_order').all(termId);
+    const stepRows = db.prepare(`
+      SELECT id, sort_order
+      FROM steps
+      WHERE term_id = ? AND COALESCE(is_optional, 0) = 0
+      ORDER BY sort_order
+    `).all(termId);
 
     // Realistic first/last name pools (diverse Central Valley demographics)
     const firstNames = [

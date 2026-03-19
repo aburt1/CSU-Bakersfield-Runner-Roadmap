@@ -79,6 +79,7 @@ export default function StepForm({ step, onSave, onCancel, selectedTermId }) {
   const [excludedTags, setExcludedTags] = useState(parseJsonArray(step?.excluded_tags));
   const [sortOrder, setSortOrder] = useState(step?.sort_order ?? '');
   const [isPublic, setIsPublic] = useState(step?.is_public === 1);
+  const [isOptional, setIsOptional] = useState(step?.is_optional === 1);
   const [showAdvancedRules, setShowAdvancedRules] = useState(parseJsonArray(step?.excluded_tags).length > 0);
 
   const existingContact = step?.contact_info
@@ -158,6 +159,7 @@ export default function StepForm({ step, onSave, onCancel, selectedTermId }) {
       contact_info: contactInfo,
       term_id: termId,
       is_public: isPublic ? 1 : 0,
+      is_optional: isOptional ? 1 : 0,
     });
   };
 
@@ -396,6 +398,18 @@ export default function StepForm({ step, onSave, onCancel, selectedTermId }) {
           />
           <span className="font-body text-sm text-csub-blue-dark">
             Show in the public preview before login
+          </span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isOptional}
+            onChange={(e) => setIsOptional(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-csub-blue focus:ring-csub-blue"
+          />
+          <span className="font-body text-sm text-csub-blue-dark">
+            Optional opportunity
           </span>
         </label>
       </Section>

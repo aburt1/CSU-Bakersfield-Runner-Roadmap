@@ -77,6 +77,11 @@ function DraggableStepRow({
                 Public
               </span>
             )}
+            {step.is_optional === 1 && (
+              <span className="ml-2 text-[10px] bg-csub-blue/10 text-csub-blue-dark px-1.5 py-0.5 rounded-full font-body font-medium align-middle">
+                Optional
+              </span>
+            )}
           </p>
           <p className="font-body text-xs text-csub-gray truncate">
             {step.description || 'No description'}

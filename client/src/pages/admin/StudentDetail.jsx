@@ -107,10 +107,17 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
     );
   }
 
-  const doneCount = Array.from(progress.values()).filter(
-    (p) => p.status === 'completed' || p.status === 'waived'
-  ).length;
-  const totalCount = steps.length;
+  const requiredSteps = steps.filter((step) => step.is_optional !== 1);
+  const optionalSteps = steps.filter((step) => step.is_optional === 1);
+  const doneCount = requiredSteps.filter((step) => {
+    const value = progress.get(step.id);
+    return value?.status === 'completed' || value?.status === 'waived';
+  }).length;
+  const optionalDoneCount = optionalSteps.filter((step) => {
+    const value = progress.get(step.id);
+    return value?.status === 'completed' || value?.status === 'waived';
+  }).length;
+  const totalCount = requiredSteps.length;
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
   return (
@@ -203,7 +210,7 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
       <div className="mb-5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="font-body text-xs text-csub-blue-dark font-semibold">
-            {doneCount} of {totalCount} steps done
+            {doneCount} of {totalCount} required steps done
           </span>
           <span className="font-display text-sm font-bold text-csub-blue">{pct}%</span>
         </div>
@@ -218,6 +225,11 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
             }}
           />
         </div>
+        {optionalSteps.length > 0 && (
+          <p className="font-body text-xs text-csub-gray mt-2">
+            Optional opportunities: <span className="font-semibold text-csub-blue-dark">{optionalDoneCount}</span> of {optionalSteps.length}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 mb-3">
@@ -227,7 +239,7 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
         <div className="flex-1 h-px bg-gray-200" />
       </div>
       <div className="space-y-2 mb-6">
-        {steps.map((step) => {
+        {requiredSteps.map((step) => {
           const prog = progress.get(step.id);
           return (
             <StepToggle
@@ -242,10 +254,43 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
               api={api}
               onToggle={handleStepToggle}
               readOnly={!canEdit}
+              isOptional={false}
             />
           );
         })}
       </div>
+
+      {optionalSteps.length > 0 && (
+        <>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
+              Optional Opportunities
+            </h3>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+          <div className="space-y-2 mb-6">
+            {optionalSteps.map((step) => {
+              const prog = progress.get(step.id);
+              return (
+                <StepToggle
+                  key={step.id}
+                  studentId={student.id}
+                  stepId={step.id}
+                  stepTitle={step.title}
+                  stepIcon={step.icon || '📋'}
+                  status={prog?.status || null}
+                  completedAt={prog?.completed_at || null}
+                  note={prog?.note || null}
+                  api={api}
+                  onToggle={handleStepToggle}
+                  readOnly={!canEdit}
+                  isOptional
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div className="flex items-center gap-3 mb-3">
         <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">

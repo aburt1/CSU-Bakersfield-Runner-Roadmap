@@ -30,11 +30,21 @@ router.post('/dev-login', (req, res) => {
       VALUES (?, ?, ?, ?)
     `).run(studentId, name, email, termId);
 
-    // Auto-complete step 1 (Accepted!) for new students
-    req.db.prepare(`
-      INSERT OR IGNORE INTO student_progress (student_id, step_id)
-      VALUES (?, 1)
-    `).run(studentId);
+    // Auto-complete the accepted step for new students
+    const acceptedStep = req.db.prepare(`
+      SELECT id
+      FROM steps
+      WHERE term_id = ? AND step_key = 'accepted'
+      ORDER BY id
+      LIMIT 1
+    `).get(termId);
+
+    if (acceptedStep?.id) {
+      req.db.prepare(`
+        INSERT OR IGNORE INTO student_progress (student_id, step_id)
+        VALUES (?, ?)
+      `).run(studentId, acceptedStep.id);
+    }
 
     student = { id: studentId, display_name: name, email };
   }

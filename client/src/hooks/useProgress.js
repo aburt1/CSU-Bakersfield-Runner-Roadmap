@@ -50,6 +50,16 @@ function deriveStepStatuses(steps, progressMap) {
   });
 }
 
+function deriveOptionalStepStatuses(steps, progressMap) {
+  return steps.map((step) => {
+    const progress = progressMap.get(step.id);
+    if (progress) {
+      return { ...step, status: progress.status || 'completed' };
+    }
+    return { ...step, status: 'not_started' };
+  });
+}
+
 export function useProgress() {
   const { token, isAuthenticated } = useAuth();
   const [steps, setSteps] = useState([]);
@@ -129,19 +139,33 @@ export function useProgress() {
   }, [isAuthenticated, token]);
 
   // Filter steps based on student tags and derive statuses
-  const enrichedSteps = useMemo(() => {
+  const { requiredSteps, optionalSteps, allSteps } = useMemo(() => {
     const applicable = steps.filter((step) => stepApplies(step, studentTags));
-    return deriveStepStatuses(applicable, progressMap);
+    const required = applicable.filter((step) => step.is_optional !== 1);
+    const optional = applicable.filter((step) => step.is_optional === 1);
+
+    const requiredWithStatuses = deriveStepStatuses(required, progressMap);
+    const optionalWithStatuses = deriveOptionalStepStatuses(optional, progressMap);
+
+    return {
+      requiredSteps: requiredWithStatuses,
+      optionalSteps: optionalWithStatuses,
+      allSteps: [...requiredWithStatuses, ...optionalWithStatuses],
+    };
   }, [steps, studentTags, progressMap]);
 
-  const totalSteps = enrichedSteps.length;
-  const doneCount = enrichedSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
+  const totalSteps = requiredSteps.length;
+  const doneCount = requiredSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
   const percentage = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
-  const currentStep = enrichedSteps.find((s) => s.status === 'in_progress') || null;
+  const currentStep = requiredSteps.find((s) => s.status === 'in_progress') || null;
   const allComplete = totalSteps > 0 && doneCount === totalSteps;
+  const optionalTotalSteps = optionalSteps.length;
+  const optionalCompletedCount = optionalSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
 
   return {
-    steps: enrichedSteps,
+    steps: allSteps,
+    requiredSteps,
+    optionalSteps,
     completedDates,
     studentTags,
     term,
@@ -152,6 +176,8 @@ export function useProgress() {
     percentage,
     currentStep,
     allComplete,
+    optionalTotalSteps,
+    optionalCompletedCount,
     retry: fetchProgress,
   };
 }
