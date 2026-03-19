@@ -204,7 +204,22 @@ export default function StudentsTab({ api, steps, role = 'viewer', termId }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-body text-sm font-semibold text-csub-blue-dark">{s.display_name}</p>
-                      <p className="font-body text-xs text-csub-gray">{s.email}</p>
+                      <p className="font-body text-xs text-csub-gray">
+                        {s.email}
+                        {s.emplid ? <span className="ml-2">· Student ID # {s.emplid}</span> : null}
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {s.applicant_type && (
+                          <span className="text-[10px] bg-gray-100 text-csub-blue-dark px-1.5 py-0.5 rounded-full font-body">
+                            {s.applicant_type}
+                          </span>
+                        )}
+                        {s.residency && (
+                          <span className="text-[10px] bg-gray-100 text-csub-blue-dark px-1.5 py-0.5 rounded-full font-body">
+                            {s.residency}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {s.overdue_step_count > 0 && (

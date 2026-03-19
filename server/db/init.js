@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { ensureStepKeys } from '../utils/stepKeys.js';
 
 const DB_PATH = process.env.DB_PATH || './data/admissions.db';
 
@@ -61,8 +62,18 @@ export async function initDatabase() {
     'ALTER TABLE steps ADD COLUMN guide_content TEXT',
     'ALTER TABLE steps ADD COLUMN links TEXT',
     'ALTER TABLE steps ADD COLUMN required_tags TEXT',
+    "ALTER TABLE steps ADD COLUMN required_tag_mode TEXT DEFAULT 'any'",
+    'ALTER TABLE steps ADD COLUMN excluded_tags TEXT',
     'ALTER TABLE steps ADD COLUMN is_active INTEGER DEFAULT 1',
     'ALTER TABLE students ADD COLUMN tags TEXT',
+    'ALTER TABLE students ADD COLUMN emplid TEXT',
+    'ALTER TABLE students ADD COLUMN preferred_name TEXT',
+    'ALTER TABLE students ADD COLUMN phone TEXT',
+    'ALTER TABLE students ADD COLUMN applicant_type TEXT',
+    'ALTER TABLE students ADD COLUMN major TEXT',
+    'ALTER TABLE students ADD COLUMN residency TEXT',
+    'ALTER TABLE students ADD COLUMN admit_term TEXT',
+    'ALTER TABLE students ADD COLUMN last_synced_at DATETIME',
     "ALTER TABLE student_progress ADD COLUMN status TEXT DEFAULT 'completed'",
     'ALTER TABLE student_progress ADD COLUMN note TEXT',
     'ALTER TABLE steps ADD COLUMN contact_info TEXT',
@@ -70,6 +81,7 @@ export async function initDatabase() {
     'ALTER TABLE steps ADD COLUMN deadline_date TEXT',
     'ALTER TABLE students ADD COLUMN term_id INTEGER',
     'ALTER TABLE steps ADD COLUMN is_public INTEGER DEFAULT 0',
+    'ALTER TABLE steps ADD COLUMN step_key TEXT',
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -86,6 +98,13 @@ export async function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Backfill legacy rows after terms exist.
+  const latestTerm = db.prepare('SELECT id FROM terms ORDER BY id DESC LIMIT 1').get();
+  if (latestTerm?.id) {
+    db.prepare('UPDATE steps SET term_id = ? WHERE term_id IS NULL').run(latestTerm.id);
+    db.prepare('UPDATE students SET term_id = ? WHERE term_id IS NULL').run(latestTerm.id);
+  }
 
   // Seed default term if empty and backfill existing data
   const termCount = db.prepare('SELECT COUNT(*) as count FROM terms').get();
@@ -111,6 +130,29 @@ export async function initDatabase() {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS integration_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      key_hash TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS integration_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      integration_client_id INTEGER NOT NULL,
+      source_event_id TEXT NOT NULL,
+      student_id_number TEXT,
+      step_key TEXT,
+      request_body TEXT,
+      response_status INTEGER NOT NULL,
+      response_body TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (integration_client_id) REFERENCES integration_clients(id)
+    );
+  `);
+
   // Seed default superadmin if empty
   const adminCount = db.prepare('SELECT COUNT(*) as count FROM admin_users').get();
   if (adminCount.count === 0) {
@@ -122,6 +164,24 @@ export async function initDatabase() {
       'INSERT INTO admin_users (email, password_hash, role, display_name) VALUES (?, ?, ?, ?)'
     ).run(email, hash, 'sysadmin', 'Admin');
     console.log(`Seeded default sysadmin: ${email}`);
+  }
+
+  // Seed default integration client in dev or when explicitly configured.
+  const integrationCount = db.prepare('SELECT COUNT(*) as count FROM integration_clients').get();
+  if (integrationCount.count === 0 && (process.env.NODE_ENV !== 'production' || process.env.INTEGRATION_DEFAULT_KEY)) {
+    const bcrypt = await import('bcrypt');
+    const clientName = process.env.INTEGRATION_DEFAULT_NAME || 'PeopleSoft Dev';
+    const clientKey = process.env.INTEGRATION_DEFAULT_KEY || 'dev-integration-key';
+    const keyHash = await bcrypt.hash(clientKey, 10);
+    db.prepare(
+      'INSERT INTO integration_clients (name, key_hash, is_active) VALUES (?, ?, 1)'
+    ).run(clientName, keyHash);
+
+    if (process.env.NODE_ENV !== 'production' && !process.env.INTEGRATION_DEFAULT_KEY) {
+      console.log(`Seeded default integration client "${clientName}" with key: ${clientKey}`);
+    } else {
+      console.log(`Seeded default integration client "${clientName}"`);
+    }
   }
 
   // Seed default steps if empty
@@ -157,6 +217,30 @@ export async function initDatabase() {
     console.log('Seeded 9 admissions steps');
   }
 
+  ensureStepKeys(db);
+
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_students_emplid_unique
+      ON students (lower(trim(emplid)))
+      WHERE emplid IS NOT NULL AND trim(emplid) <> '';
+    `);
+  } catch (error) {
+    console.warn('[db-init] Unable to create unique Student ID # index:', error.message);
+  }
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_steps_term_step_key_unique
+    ON steps (term_id, step_key)
+    WHERE term_id IS NOT NULL AND step_key IS NOT NULL AND trim(step_key) <> '';
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_events_unique
+    ON integration_events (integration_client_id, source_event_id);
+
+    CREATE INDEX IF NOT EXISTS idx_steps_step_key_lookup
+    ON steps (term_id, step_key);
+  `);
+
   // Seed 50 sample students if empty
   const studentCount = db.prepare('SELECT COUNT(*) as count FROM students').get();
   if (studentCount.count === 0) {
@@ -184,22 +268,36 @@ export async function initDatabase() {
       'Mitchell', 'Campbell', 'Roberts', 'Phillips',
     ];
 
-    const tagOptions = [
-      '["first-gen"]',
-      '["transfer"]',
-      '["out-of-state"]',
-      '["first-gen","eop"]',
-      '["honors"]',
-      '["athlete"]',
-      '["transfer","veteran"]',
-      '["first-gen","honors"]',
-      '["veteran"]',
-      '["eop"]',
-      null, null, null, // ~25% have no tags
+    const applicantTypes = ['First-Time Freshman', 'Transfer', 'First-Time Freshman', 'Transfer', 'Readmit'];
+    const majors = [
+      'Business Administration',
+      'Computer Science',
+      'Psychology',
+      'Nursing',
+      'Mechanical Engineering',
+      'Biology',
+      'Criminal Justice',
+      'Kinesiology',
+      'Sociology',
+      'Liberal Studies',
+    ];
+    const residencies = ['In-State', 'In-State', 'In-State', 'Out-of-State'];
+    const manualTagOptions = [
+      ['first-gen'],
+      ['honors'],
+      ['eop'],
+      ['athlete'],
+      ['veteran'],
+      ['first-gen', 'honors'],
+      [],
+      [],
     ];
 
     const insertStudent = db.prepare(
-      'INSERT INTO students (id, display_name, email, azure_id, tags, term_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      `INSERT INTO students (
+        id, display_name, email, azure_id, tags, term_id, created_at, emplid,
+        preferred_name, phone, applicant_type, major, residency, admit_term, last_synced_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const insertProgress = db.prepare(
       'INSERT INTO student_progress (student_id, step_id, completed_at, status) VALUES (?, ?, ?, ?)'
@@ -236,13 +334,38 @@ export async function initDatabase() {
         const email = `${first.toLowerCase()}${last.toLowerCase().charAt(0)}@csub.edu`;
         const id = `seed-student-${String(i + 1).padStart(3, '0')}`;
         const azureId = `azure-${id}`;
-        const tags = tagOptions[i % tagOptions.length];
+        const applicantType = applicantTypes[i % applicantTypes.length];
+        const major = majors[i % majors.length];
+        const residency = residencies[i % residencies.length];
+        const emplid = `00${String(1000000 + i)}`;
+        const preferredName = i % 6 === 0 ? first : null;
+        const phone = `(661) 654-${String(1200 + i).padStart(4, '0')}`;
+        const admitTerm = 'Fall 2026';
+        const lastSyncedAt = new Date(Date.now() - (i % 10) * 3600000).toISOString();
+
+        const manualTags = manualTagOptions[i % manualTagOptions.length];
 
         // Stagger created_at dates over the last 60 days
         const daysAgo = Math.floor(Math.random() * 60) + 1;
         const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
 
-        insertStudent.run(id, name, email, azureId, tags, termId, createdAt);
+        insertStudent.run(
+          id,
+          name,
+          email,
+          azureId,
+          manualTags.length > 0 ? JSON.stringify(manualTags) : null,
+          termId,
+          createdAt,
+          emplid,
+          preferredName,
+          phone,
+          applicantType,
+          major,
+          residency,
+          admitTerm,
+          lastSyncedAt
+        );
 
         // Assign progress based on weighted profile
         const stepsCompleted = progressionPool[i % progressionPool.length];

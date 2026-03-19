@@ -2,21 +2,16 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { adminAuth } from '../middleware/adminAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { safeJsonParse } from '../utils/json.js';
+import { logAudit } from '../utils/audit.js';
+import { applyStudentProgressChange } from '../utils/progress.js';
+import { getUniqueStepKeyForTerm } from '../utils/stepKeys.js';
+import { getDerivedTags, getManualTags, getMergedTags } from '../utils/studentTags.js';
 
 const router = Router();
 
 // All admin routes require authentication
 router.use(adminAuth);
-
-// ─── Audit Helper ───────────────────────────────────────
-
-function logAudit(db, req, { entityType, entityId, action, details }) {
-  const changedBy = req.adminUser?.displayName || req.adminUser?.email || 'admin';
-  db.prepare(`
-    INSERT INTO audit_log (entity_type, entity_id, action, changed_by, details)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(entityType, String(entityId), action, changedBy, details ? JSON.stringify(details) : null);
-}
 
 // ─── Step CRUD ───────────────────────────────────────────
 
@@ -31,18 +26,49 @@ router.get('/steps', (req, res) => {
 
 // POST /api/admin/steps — create a new step (admissions_editor+)
 router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
-  const { title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, contact_info, term_id, is_public } = req.body;
+  const {
+    title,
+    description,
+    icon,
+    sort_order,
+    deadline,
+    deadline_date,
+    guide_content,
+    links,
+    required_tags,
+    required_tag_mode,
+    excluded_tags,
+    contact_info,
+    term_id,
+    is_public,
+    step_key,
+  } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
   }
+  if (!term_id) {
+    return res.status(400).json({ error: 'term_id is required' });
+  }
 
-  const maxOrder = req.db.prepare('SELECT MAX(sort_order) as max FROM steps').get();
+  const termId = parseInt(term_id, 10);
+  const term = req.db.prepare('SELECT id FROM terms WHERE id = ?').get(termId);
+  if (!term) {
+    return res.status(400).json({ error: 'Invalid term_id' });
+  }
+
+  const nextStepKey = getUniqueStepKeyForTerm(req.db, termId, {
+    stepKey: step_key,
+    title,
+    fallback: 'step',
+  });
+
+  const maxOrder = req.db.prepare('SELECT MAX(sort_order) as max FROM steps WHERE term_id = ?').get(termId);
   const order = sort_order ?? (maxOrder.max || 0) + 1;
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, contact_info, term_id, is_active, is_public)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
   `).run(
     title,
     description || null,
@@ -53,8 +79,11 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
     guide_content || null,
     links ? JSON.stringify(links) : null,
     required_tags ? JSON.stringify(required_tags) : null,
+    required_tag_mode === 'all' ? 'all' : 'any',
+    excluded_tags ? JSON.stringify(excluded_tags) : null,
     contact_info ? JSON.stringify(contact_info) : null,
-    term_id || null,
+    termId,
+    nextStepKey,
     is_public ? 1 : 0
   );
 
@@ -62,7 +91,7 @@ router.post('/steps', requireRole('admissions_editor', 'sysadmin'), (req, res) =
     entityType: 'step',
     entityId: result.lastInsertRowid,
     action: 'step_create',
-    details: { title },
+    details: { title, stepKey: nextStepKey },
   });
 
   res.json({ success: true, id: result.lastInsertRowid });
@@ -122,7 +151,17 @@ router.put('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, res
     return res.status(404).json({ error: 'Step not found' });
   }
 
-  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'deadline_date', 'guide_content', 'links', 'required_tags', 'contact_info', 'term_id', 'is_active', 'is_public'];
+  const requestedTermId = req.body.term_id !== undefined ? parseInt(req.body.term_id, 10) : step.term_id;
+  if (!requestedTermId) {
+    return res.status(400).json({ error: 'term_id is required' });
+  }
+
+  const term = req.db.prepare('SELECT id FROM terms WHERE id = ?').get(requestedTermId);
+  if (!term) {
+    return res.status(400).json({ error: 'Invalid term_id' });
+  }
+
+  const fields = ['title', 'description', 'icon', 'sort_order', 'deadline', 'deadline_date', 'guide_content', 'links', 'required_tags', 'required_tag_mode', 'excluded_tags', 'contact_info', 'term_id', 'is_active', 'is_public'];
   const updates = [];
   const values = [];
 
@@ -130,12 +169,28 @@ router.put('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, res
     if (req.body[field] !== undefined) {
       updates.push(`${field} = ?`);
       const val = req.body[field];
-      if (field === 'links' || field === 'required_tags' || field === 'contact_info') {
+      if (field === 'links' || field === 'required_tags' || field === 'excluded_tags' || field === 'contact_info') {
         values.push(val ? JSON.stringify(val) : null);
+      } else if (field === 'required_tag_mode') {
+        values.push(val === 'all' ? 'all' : 'any');
       } else {
         values.push(val);
       }
     }
+  }
+
+  const termChanged = requestedTermId !== step.term_id;
+  const shouldUpdateStepKey = req.body.step_key !== undefined || !step.step_key || termChanged;
+  if (shouldUpdateStepKey) {
+    updates.push('step_key = ?');
+    values.push(
+      getUniqueStepKeyForTerm(req.db, requestedTermId, {
+        stepKey: req.body.step_key ?? step.step_key,
+        title: req.body.title ?? step.title,
+        fallback: `step-${id}`,
+        excludeStepId: id,
+      })
+    );
   }
 
   if (updates.length === 0) {
@@ -151,7 +206,7 @@ router.put('/steps/:id', requireRole('admissions_editor', 'sysadmin'), (req, res
     entityType: 'step',
     entityId: id,
     action,
-    details: { title: step.title, fields: Object.keys(req.body) },
+    details: { title: step.title, fields: shouldUpdateStepKey ? [...Object.keys(req.body), 'step_key'] : Object.keys(req.body) },
   });
 
   res.json({ success: true });
@@ -181,12 +236,17 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
     return res.status(404).json({ error: 'Step not found' });
   }
 
-  const maxOrder = req.db.prepare('SELECT MAX(sort_order) as max FROM steps').get();
+  const maxOrder = req.db.prepare('SELECT MAX(sort_order) as max FROM steps WHERE term_id = ?').get(step.term_id);
   const newOrder = (maxOrder.max || 0) + 1;
+  const duplicatedStepKey = getUniqueStepKeyForTerm(req.db, step.term_id, {
+    stepKey: `${step.step_key || step.title}-copy`,
+    title: `${step.title} Copy`,
+    fallback: `step-${step.id}-copy`,
+  });
 
   const result = req.db.prepare(`
-    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, contact_info, term_id, is_active, is_public)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
   `).run(
     step.title + ' (Copy)',
     step.description,
@@ -197,8 +257,11 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
     step.guide_content,
     step.links,
     step.required_tags,
+    step.required_tag_mode || 'any',
+    step.excluded_tags,
     step.contact_info,
     step.term_id,
+    duplicatedStepKey,
     step.is_public || 0
   );
 
@@ -206,7 +269,7 @@ router.post('/steps/:id/duplicate', requireRole('admissions_editor', 'sysadmin')
     entityType: 'step',
     entityId: result.lastInsertRowid,
     action: 'step_create',
-    details: { title: step.title + ' (Copy)', duplicatedFrom: id },
+    details: { title: step.title + ' (Copy)', duplicatedFrom: id, stepKey: duplicatedStepKey },
   });
 
   res.json({ success: true, id: result.lastInsertRowid });
@@ -226,24 +289,46 @@ router.post('/students/:studentId/steps/:stepId/complete', requireRole('admissio
     return res.status(404).json({ error: 'Student not found' });
   }
 
-  const stepRow = req.db.prepare('SELECT id, title FROM steps WHERE id = ?').get(step);
+  const stepRow = req.db.prepare('SELECT id, title, step_key FROM steps WHERE id = ?').get(step);
   if (!stepRow) {
     return res.status(404).json({ error: 'Step not found' });
   }
 
-  req.db.prepare(`
-    INSERT OR REPLACE INTO student_progress (student_id, step_id, status, note)
-    VALUES (?, ?, ?, ?)
-  `).run(studentId, step, progressStatus, note || null);
-
-  logAudit(req.db, req, {
-    entityType: 'student_progress',
-    entityId: studentId,
-    action: progressStatus === 'waived' ? 'waive' : 'complete',
-    details: { stepId: step, stepTitle: stepRow.title, studentName: student.display_name, note: note || null },
+  const progressChange = applyStudentProgressChange(req.db, {
+    studentId,
+    stepId: step,
+    status: progressStatus,
+    note,
   });
 
-  res.json({ success: true, studentId, stepId: step, status: progressStatus, completedAt: new Date().toISOString() });
+  if (progressChange.error) {
+    return res.status(400).json({ error: progressChange.error });
+  }
+
+  if (progressChange.result !== 'noop') {
+    logAudit(req.db, req, {
+      entityType: 'student_progress',
+      entityId: studentId,
+      action: progressStatus === 'waived' ? 'waive' : 'complete',
+      details: {
+        stepId: step,
+        stepKey: stepRow.step_key || null,
+        stepTitle: stepRow.title,
+        studentName: student.display_name,
+        note: note || null,
+        result: progressChange.result,
+      },
+    });
+  }
+
+  res.json({
+    success: true,
+    studentId,
+    stepId: step,
+    status: progressChange.status,
+    result: progressChange.result,
+    completedAt: progressChange.completedAt,
+  });
 });
 
 // DELETE /api/admin/students/:studentId/steps/:stepId/complete (admissions+)
@@ -253,28 +338,49 @@ router.delete('/students/:studentId/steps/:stepId/complete', requireRole('admiss
   const { note } = req.body || {};
 
   const student = req.db.prepare('SELECT display_name FROM students WHERE id = ?').get(studentId);
-  const stepRow = req.db.prepare('SELECT title FROM steps WHERE id = ?').get(step);
+  const stepRow = req.db.prepare('SELECT title, step_key FROM steps WHERE id = ?').get(step);
 
-  req.db.prepare(`
-    DELETE FROM student_progress
-    WHERE student_id = ? AND step_id = ?
-  `).run(studentId, step);
-
-  logAudit(req.db, req, {
-    entityType: 'student_progress',
-    entityId: studentId,
-    action: 'uncomplete',
-    details: { stepId: step, stepTitle: stepRow?.title, studentName: student?.display_name, note: note || null },
+  const progressChange = applyStudentProgressChange(req.db, {
+    studentId,
+    stepId: step,
+    status: 'not_completed',
+    note,
   });
 
-  res.json({ success: true, studentId, stepId: step });
+  if (progressChange.error) {
+    return res.status(400).json({ error: progressChange.error });
+  }
+
+  if (progressChange.result !== 'noop') {
+    logAudit(req.db, req, {
+      entityType: 'student_progress',
+      entityId: studentId,
+      action: 'uncomplete',
+      details: {
+        stepId: step,
+        stepKey: stepRow?.step_key || null,
+        stepTitle: stepRow?.title,
+        studentName: student?.display_name,
+        note: note || null,
+        result: progressChange.result,
+      },
+    });
+  }
+
+  res.json({ success: true, studentId, stepId: step, result: progressChange.result, status: progressChange.status });
 });
 
 // GET /api/admin/students/:studentId/progress
 router.get('/students/:studentId/progress', (req, res) => {
   const { studentId } = req.params;
 
-  const student = req.db.prepare('SELECT id, display_name, email, azure_id, tags, created_at FROM students WHERE id = ?').get(studentId);
+  const student = req.db.prepare(`
+    SELECT
+      id, display_name, email, azure_id, tags, created_at, term_id,
+      emplid, preferred_name, phone, applicant_type, major, residency, admit_term, last_synced_at
+    FROM students
+    WHERE id = ?
+  `).get(studentId);
   if (!student) {
     return res.status(404).json({ error: 'Student not found' });
   }
@@ -287,7 +393,72 @@ router.get('/students/:studentId/progress', (req, res) => {
     ORDER BY sp.step_id
   `).all(studentId);
 
-  res.json({ student, progress });
+  res.json({
+    student,
+    manualTags: getManualTags(student),
+    derivedTags: getDerivedTags(student),
+    mergedTags: getMergedTags(student),
+    progress,
+  });
+});
+
+// PUT /api/admin/students/:studentId/profile (admissions+)
+router.put('/students/:studentId/profile', requireRole('admissions', 'admissions_editor', 'sysadmin'), (req, res) => {
+  const { studentId } = req.params;
+  const student = req.db.prepare(`
+    SELECT
+      id, display_name, email, emplid, preferred_name, phone,
+      applicant_type, major, residency, admit_term, last_synced_at
+    FROM students
+    WHERE id = ?
+  `).get(studentId);
+
+  if (!student) {
+    return res.status(404).json({ error: 'Student not found' });
+  }
+
+  const fields = [
+    'display_name',
+    'email',
+    'emplid',
+    'preferred_name',
+    'phone',
+    'applicant_type',
+    'major',
+    'residency',
+    'admit_term',
+    'last_synced_at',
+  ];
+
+  const updates = [];
+  const values = [];
+
+  for (const field of fields) {
+    if (req.body[field] !== undefined) {
+      updates.push(`${field} = ?`);
+      values.push(req.body[field] || null);
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No profile fields to update' });
+  }
+
+  values.push(studentId);
+  req.db.prepare(`UPDATE students SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  logAudit(req.db, req, {
+    entityType: 'student_profile',
+    entityId: studentId,
+    action: 'student_profile_update',
+    details: {
+      studentName: student.display_name,
+      emplid: req.body.emplid !== undefined ? req.body.emplid : student.emplid,
+      fields: Object.keys(req.body),
+    },
+  });
+
+  res.json({ success: true });
 });
 
 // PUT /api/admin/students/:studentId/tags (admissions+)
@@ -295,12 +466,12 @@ router.put('/students/:studentId/tags', requireRole('admissions', 'admissions_ed
   const { studentId } = req.params;
   const { tags } = req.body;
 
-  const student = req.db.prepare('SELECT id, tags FROM students WHERE id = ?').get(studentId);
+  const student = req.db.prepare('SELECT id, tags, display_name FROM students WHERE id = ?').get(studentId);
   if (!student) {
     return res.status(404).json({ error: 'Student not found' });
   }
 
-  const oldTags = student.tags ? JSON.parse(student.tags) : [];
+  const oldTags = safeJsonParse(student.tags, []);
 
   req.db.prepare('UPDATE students SET tags = ? WHERE id = ?').run(
     Array.isArray(tags) ? JSON.stringify(tags) : null,
@@ -311,7 +482,7 @@ router.put('/students/:studentId/tags', requireRole('admissions', 'admissions_ed
     entityType: 'student_tags',
     entityId: studentId,
     action: 'tags_update',
-    details: { oldTags, newTags: tags || [] },
+    details: { oldTags, newTags: tags || [], studentName: student.display_name || null },
   });
 
   res.json({ success: true });
@@ -329,6 +500,7 @@ router.get('/students', (req, res) => {
 
   const baseQuery = `
     SELECT s.id, s.display_name, s.email, s.azure_id, s.tags, s.created_at, s.term_id,
+           s.emplid, s.applicant_type, s.major, s.residency, s.admit_term,
            COALESCE(pc.completed, 0) as completed_steps,
            COALESCE(ov.overdue_count, 0) as overdue_step_count
     FROM students s
@@ -351,8 +523,8 @@ router.get('/students', (req, res) => {
   const where = [];
   const params = [];
   if (search) {
-    where.push('(s.display_name LIKE ? OR s.email LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+    where.push('(s.display_name LIKE ? OR s.email LIKE ? OR COALESCE(s.emplid, \'\') LIKE ? OR COALESCE(s.major, \'\') LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (termId) {
     where.push('s.term_id = ?');
@@ -395,7 +567,7 @@ router.get('/students', (req, res) => {
 
 // GET /api/admin/audit
 router.get('/audit', (req, res) => {
-  const { studentId, entityType, limit = '50', offset = '0' } = req.query;
+  const { studentId, entityType, action, changedBy, q, limit = '50', offset = '0' } = req.query;
   const lim = Math.min(parseInt(limit, 10) || 50, 200);
   const off = parseInt(offset, 10) || 0;
 
@@ -403,12 +575,24 @@ router.get('/audit', (req, res) => {
   let params = [];
 
   if (studentId) {
-    where.push(`entity_id = ? AND entity_type IN ('student_progress', 'student_tags')`);
+    where.push(`entity_id = ? AND entity_type IN ('student_progress', 'student_tags', 'student_profile')`);
     params.push(studentId);
   }
   if (entityType) {
     where.push('entity_type = ?');
     params.push(entityType);
+  }
+  if (action) {
+    where.push('action = ?');
+    params.push(action);
+  }
+  if (changedBy) {
+    where.push('changed_by LIKE ?');
+    params.push(`%${changedBy}%`);
+  }
+  if (q) {
+    where.push('(entity_type LIKE ? OR action LIKE ? OR changed_by LIKE ? OR COALESCE(details, \'\') LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -648,7 +832,7 @@ router.post('/terms', requireRole('admissions_editor', 'sysadmin'), (req, res) =
   const { name, start_date, end_date } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
   const result = req.db.prepare(
-    'INSERT INTO terms (name, start_date, end_date) VALUES (?, ?, ?)'
+    'INSERT INTO terms (name, start_date, end_date, is_active) VALUES (?, ?, ?, 0)'
   ).run(name, start_date || null, end_date || null);
   logAudit(req.db, req, { entityType: 'term', entityId: result.lastInsertRowid, action: 'term_create', details: { name } });
   res.json({ success: true, id: result.lastInsertRowid });
@@ -658,6 +842,34 @@ router.post('/terms', requireRole('admissions_editor', 'sysadmin'), (req, res) =
 router.put('/terms/:id', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { name, start_date, end_date, is_active } = req.body;
+  const term = req.db.prepare('SELECT * FROM terms WHERE id = ?').get(id);
+  if (!term) {
+    return res.status(404).json({ error: 'Term not found' });
+  }
+
+  if (is_active === 1 || is_active === true) {
+    const activate = req.db.transaction(() => {
+      req.db.prepare('UPDATE terms SET is_active = 0').run();
+      req.db.prepare(`
+        UPDATE terms
+        SET
+          name = COALESCE(?, name),
+          start_date = ?,
+          end_date = ?,
+          is_active = 1
+        WHERE id = ?
+      `).run(
+        name !== undefined ? name : null,
+        start_date !== undefined ? start_date : term.start_date,
+        end_date !== undefined ? end_date : term.end_date,
+        id
+      );
+    });
+    activate();
+    logAudit(req.db, req, { entityType: 'term', entityId: id, action: 'term_update', details: { name: name !== undefined ? name : term.name, fields: Object.keys(req.body) } });
+    return res.json({ success: true });
+  }
+
   const updates = [];
   const values = [];
   if (name !== undefined) { updates.push('name = ?'); values.push(name); }
@@ -667,7 +879,127 @@ router.put('/terms/:id', requireRole('admissions_editor', 'sysadmin'), (req, res
   if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
   values.push(id);
   req.db.prepare(`UPDATE terms SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-  logAudit(req.db, req, { entityType: 'term', entityId: id, action: 'term_update', details: { fields: Object.keys(req.body) } });
+  logAudit(req.db, req, { entityType: 'term', entityId: id, action: 'term_update', details: { name: name !== undefined ? name : term.name, fields: Object.keys(req.body) } });
+  res.json({ success: true });
+});
+
+// POST /api/admin/terms/:id/clone (admissions_editor+)
+router.post('/terms/:id/clone', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
+  const sourceTermId = parseInt(req.params.id, 10);
+  const { name, start_date, end_date, step_ids } = req.body || {};
+
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (!Array.isArray(step_ids) || step_ids.length === 0) {
+    return res.status(400).json({ error: 'step_ids must be a non-empty array' });
+  }
+
+  const sourceTerm = req.db.prepare('SELECT * FROM terms WHERE id = ?').get(sourceTermId);
+  if (!sourceTerm) {
+    return res.status(404).json({ error: 'Source term not found' });
+  }
+
+  const placeholders = step_ids.map(() => '?').join(', ');
+  const sourceSteps = req.db.prepare(`
+    SELECT *
+    FROM steps
+    WHERE term_id = ? AND id IN (${placeholders})
+    ORDER BY sort_order
+  `).all(sourceTermId, ...step_ids);
+
+  if (sourceSteps.length === 0) {
+    return res.status(400).json({ error: 'No matching steps found for source term' });
+  }
+
+  const cloneResult = req.db.transaction(() => {
+    const termResult = req.db.prepare(
+      'INSERT INTO terms (name, start_date, end_date, is_active) VALUES (?, ?, ?, 0)'
+    ).run(name, start_date || null, end_date || null);
+
+    const newTermId = termResult.lastInsertRowid;
+    const insertStep = req.db.prepare(`
+      INSERT INTO steps (title, description, icon, sort_order, deadline, deadline_date, guide_content, links, required_tags, required_tag_mode, excluded_tags, contact_info, term_id, step_key, is_active, is_public)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const clonedSteps = sourceSteps.map((step) => {
+      const result = insertStep.run(
+        step.title,
+        step.description,
+        step.icon,
+        step.sort_order,
+        step.deadline,
+        step.deadline_date,
+        step.guide_content,
+        step.links,
+        step.required_tags,
+        step.required_tag_mode || 'any',
+        step.excluded_tags,
+        step.contact_info,
+        newTermId,
+        step.step_key,
+        step.is_active ?? 1,
+        step.is_public ?? 0
+      );
+
+      return req.db.prepare('SELECT * FROM steps WHERE id = ?').get(result.lastInsertRowid);
+    });
+
+    logAudit(req.db, req, {
+      entityType: 'term',
+      entityId: newTermId,
+      action: 'term_create',
+      details: { name, clonedFrom: sourceTermId, stepCount: clonedSteps.length },
+    });
+
+    return {
+      term: req.db.prepare('SELECT * FROM terms WHERE id = ?').get(newTermId),
+      steps: clonedSteps,
+    };
+  });
+
+  const result = cloneResult();
+  res.json(result);
+});
+
+// DELETE /api/admin/terms/:id (admissions_editor+)
+router.delete('/terms/:id', requireRole('admissions_editor', 'sysadmin'), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const term = req.db.prepare('SELECT * FROM terms WHERE id = ?').get(id);
+  if (!term) {
+    return res.status(404).json({ error: 'Term not found' });
+  }
+
+  const studentCount = req.db.prepare('SELECT COUNT(*) as count FROM students WHERE term_id = ?').get(id).count;
+  if (studentCount > 0) {
+    return res.status(409).json({ error: 'Cannot delete a term that still has students assigned' });
+  }
+
+  const deleteTerm = req.db.transaction(() => {
+    const steps = req.db.prepare('SELECT id, title FROM steps WHERE term_id = ?').all(id);
+
+    for (const step of steps) {
+      req.db.prepare('DELETE FROM student_progress WHERE step_id = ?').run(step.id);
+      req.db.prepare('DELETE FROM steps WHERE id = ?').run(step.id);
+      logAudit(req.db, req, {
+        entityType: 'step',
+        entityId: step.id,
+        action: 'step_delete',
+        details: { title: step.title, deletedWithTerm: id },
+      });
+    }
+
+    req.db.prepare('DELETE FROM terms WHERE id = ?').run(id);
+    logAudit(req.db, req, {
+      entityType: 'term',
+      entityId: id,
+      action: 'term_delete',
+      details: { name: term.name, deletedStepCount: steps.length },
+    });
+  });
+
+  deleteTerm();
   res.json({ success: true });
 });
 

@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAdminApi } from './hooks/useAdminApi';
 import AdminLogin from './AdminLogin';
 import StudentsTab from './StudentsTab';
-import StepsTab from './StepsTab';
 import AuditLogTab from './AuditLogTab';
 import AdminUsersTab from './AdminUsersTab';
-import TermsTab from './TermsTab';
 import AnalyticsTab from './AnalyticsTab';
+import TermStepsTab from './TermStepsTab';
 import { ROLES } from './roleConfig';
 
 const TAB_ICONS = {
@@ -15,7 +14,7 @@ const TAB_ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   ),
-  steps: (
+  termSteps: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
@@ -55,6 +54,22 @@ export default function AdminPage() {
   const [selectedTermId, setSelectedTermId] = useState(null);
   const api = useAdminApi(token);
 
+  const handleTermsChange = (nextTerms, preferredTermId = selectedTermId) => {
+    setTerms(nextTerms);
+    if (preferredTermId && nextTerms.some((term) => term.id === preferredTermId)) {
+      setSelectedTermId(preferredTermId);
+      return;
+    }
+
+    const active = nextTerms.find((term) => term.is_active);
+    if (active) {
+      setSelectedTermId(active.id);
+      return;
+    }
+
+    setSelectedTermId(nextTerms[0]?.id || null);
+  };
+
   const handleLogin = (newToken, user) => {
     sessionStorage.setItem('csub_admin_token', newToken);
     sessionStorage.setItem('csub_admin_user', JSON.stringify(user));
@@ -73,10 +88,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!token) return;
     api.get('/terms').then((data) => {
-      setTerms(data);
-      // Default to the active term
-      const active = data.find((t) => t.is_active);
-      if (active) setSelectedTermId(active.id);
+      handleTermsChange(data);
     }).catch(() => {});
   }, [token, api]);
 
@@ -91,13 +103,13 @@ export default function AdminPage() {
   }
 
   const role = adminUser?.role || 'viewer';
+  const showHeaderTermSelector = ['students', 'termSteps', 'analytics'].includes(activeTab) && terms.length > 0;
 
   const tabs = [
     { key: 'students', label: 'Students' },
-    { key: 'steps', label: 'Steps' },
+    { key: 'termSteps', label: 'Terms & Steps' },
     { key: 'analytics', label: 'Analytics' },
     { key: 'audit', label: 'Audit Log' },
-    ...(['admissions_editor', 'sysadmin'].includes(role) ? [{ key: 'terms', label: 'Terms' }] : []),
     ...(role === 'sysadmin' ? [{ key: 'users', label: 'Users' }] : []),
   ];
 
@@ -112,25 +124,29 @@ export default function AdminPage() {
               CSUB Admissions Admin
             </h1>
             <div className="flex items-center gap-3 text-sm font-body">
+              {showHeaderTermSelector && (
+                <label className="flex items-center gap-2 text-xs text-white/70">
+                  <span className="uppercase tracking-wider font-display font-bold text-[10px]">Term</span>
+                  <select
+                    value={selectedTermId || ''}
+                    onChange={(e) => setSelectedTermId(parseInt(e.target.value, 10))}
+                    className="bg-white/10 text-white border border-white/20 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-csub-gold"
+                    aria-label="Selected term"
+                  >
+                    {terms.map((t) => (
+                      <option key={t.id} value={t.id} className="text-gray-900">
+                        {t.name}{t.is_active ? '' : ' (inactive)'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <span className="text-white/70">
                 {adminUser?.displayName}
                 <span className="text-white/40 ml-1.5 text-xs">
                   {ROLES[role]?.label || role}
                 </span>
               </span>
-              {terms.length > 0 && (
-                <select
-                  value={selectedTermId || ''}
-                  onChange={(e) => setSelectedTermId(parseInt(e.target.value, 10))}
-                  className="bg-white/10 text-white border border-white/20 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-csub-gold"
-                >
-                  {terms.map((t) => (
-                    <option key={t.id} value={t.id} className="text-gray-900">
-                      {t.name}{t.is_active ? '' : ' (inactive)'}
-                    </option>
-                  ))}
-                </select>
-              )}
               <button
                 onClick={handleLogout}
                 className="text-white/50 hover:text-white transition-colors"
@@ -169,10 +185,18 @@ export default function AdminPage() {
       {/* Tab content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8" role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
         {activeTab === 'students' && <StudentsTab api={api} steps={steps} role={role} termId={selectedTermId} />}
-        {activeTab === 'steps' && <StepsTab api={api} role={role} termId={selectedTermId} />}
+        {activeTab === 'termSteps' && (
+          <TermStepsTab
+            api={api}
+            role={role}
+            terms={terms}
+            selectedTermId={selectedTermId}
+            onTermsChange={handleTermsChange}
+            onSelectTerm={setSelectedTermId}
+          />
+        )}
         {activeTab === 'analytics' && <AnalyticsTab api={api} termId={selectedTermId} />}
         {activeTab === 'audit' && <AuditLogTab api={api} />}
-        {activeTab === 'terms' && ['admissions_editor', 'sysadmin'].includes(role) && <TermsTab api={api} onTermsChange={(t) => setTerms(t)} />}
         {activeTab === 'users' && role === 'sysadmin' && <AdminUsersTab api={api} />}
       </div>
     </div>

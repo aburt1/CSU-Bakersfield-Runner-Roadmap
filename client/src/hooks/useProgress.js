@@ -9,9 +9,17 @@ function stepApplies(step, studentTags) {
   const requiredTags = step.required_tags
     ? (typeof step.required_tags === 'string' ? JSON.parse(step.required_tags) : step.required_tags)
     : null;
+  const excludedTags = step.excluded_tags
+    ? (typeof step.excluded_tags === 'string' ? JSON.parse(step.excluded_tags) : step.excluded_tags)
+    : null;
+  const requiredTagMode = step.required_tag_mode === 'all' ? 'all' : 'any';
+
+  if (excludedTags && excludedTags.some((tag) => studentTags.includes(tag))) return false;
 
   if (!requiredTags || requiredTags.length === 0) return true;
-  return requiredTags.some((tag) => studentTags.includes(tag));
+  return requiredTagMode === 'all'
+    ? requiredTags.every((tag) => studentTags.includes(tag))
+    : requiredTags.some((tag) => studentTags.includes(tag));
 }
 
 /**
@@ -57,7 +65,8 @@ export function useProgress() {
   useEffect(() => {
     async function fetchSteps() {
       try {
-        const res = await fetch(`${API_BASE}/steps`);
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+        const res = await fetch(`${API_BASE}/steps`, { headers });
         if (res.ok) {
           const data = await res.json();
           setSteps(data);
@@ -69,7 +78,7 @@ export function useProgress() {
       }
     }
     fetchSteps();
-  }, []);
+  }, [token]);
 
   // Fetch progress + tags from server
   const fetchProgress = async () => {

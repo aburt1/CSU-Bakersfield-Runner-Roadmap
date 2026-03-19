@@ -3,12 +3,42 @@ import TagEditor from './TagEditor';
 import StepToggle from './StepToggle';
 import AuditTimeline from './AuditTimeline';
 
+function parseTags(rawTags) {
+  if (!rawTags) return [];
+  if (Array.isArray(rawTags)) return rawTags;
+  try {
+    return JSON.parse(rawTags);
+  } catch {
+    return [];
+  }
+}
+
+const PROFILE_FIELDS = [
+  { key: 'emplid', label: 'Student ID #' },
+  { key: 'preferred_name', label: 'Preferred Name' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'applicant_type', label: 'Applicant Type' },
+  { key: 'major', label: 'Major' },
+  { key: 'residency', label: 'Residency' },
+  { key: 'admit_term', label: 'Admit Term' },
+];
+
+function displayDate(value, withTime = false) {
+  if (!value) return 'Not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return withTime
+    ? date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function StudentDetail({ student, steps, api, role = 'viewer', onProgressChange }) {
   const canEdit = role === 'admissions' || role === 'admissions_editor' || role === 'sysadmin';
-  const [progress, setProgress] = useState(new Map()); // stepId -> { completed_at, status, note }
+  const [progress, setProgress] = useState(new Map());
   const [studentTags, setStudentTags] = useState([]);
+  const [derivedTags, setDerivedTags] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  const [createdAt, setCreatedAt] = useState(null);
+  const [studentProfile, setStudentProfile] = useState(null);
 
   useEffect(() => {
     if (!student) return;
@@ -23,14 +53,21 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
         });
       }
       setProgress(map);
-      setStudentTags(data.student?.tags ? JSON.parse(data.student.tags) : []);
-      setCreatedAt(data.student?.created_at || null);
+      setStudentTags(data.manualTags || parseTags(data.student?.tags));
+      setDerivedTags(data.derivedTags || []);
+      setStudentProfile(data.student || null);
     }).catch(() => {});
 
     api.get(`/audit?studentId=${student.id}&limit=20`).then((data) => {
       setAuditLogs(data.logs);
     }).catch(() => {});
   }, [student, api]);
+
+  const refreshAudit = () => {
+    api.get(`/audit?studentId=${student.id}&limit=20`).then((data) => {
+      setAuditLogs(data.logs);
+    }).catch(() => {});
+  };
 
   const handleStepToggle = (stepId, newStatus) => {
     setProgress((prev) => {
@@ -47,26 +84,24 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
       return next;
     });
     onProgressChange?.();
-    // Refresh audit
-    api.get(`/audit?studentId=${student.id}&limit=20`).then((data) => {
-      setAuditLogs(data.logs);
-    }).catch(() => {});
+    refreshAudit();
   };
 
   const saveTags = async (newTags) => {
     setStudentTags(newTags);
     try {
       await api.put(`/students/${student.id}/tags`, { tags: newTags });
-      const data = await api.get(`/audit?studentId=${student.id}&limit=20`);
-      setAuditLogs(data.logs);
-    } catch { /* ignore */ }
+      refreshAudit();
+    } catch {
+      // ignore
+    }
   };
 
   if (!student) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="font-body text-sm text-csub-gray">
-          Select a student to manage their progress and tags.
+          Select a student to manage their progress, imported profile, and tags.
         </p>
       </div>
     );
@@ -80,35 +115,91 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
 
   return (
     <div>
-      {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-csub-blue flex items-center justify-center text-white font-display font-bold text-lg flex-shrink-0">
-            {student.display_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+            {student.display_name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
-              {student.display_name}
+              {studentProfile?.preferred_name || student.display_name}
             </h2>
             <p className="font-body text-sm text-csub-gray">{student.email}</p>
-            {createdAt && (
-              <p className="font-body text-xs text-csub-gray mt-0.5">
-                Registered {new Date(createdAt + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              {studentProfile?.emplid && (
+                <span className="text-[10px] bg-csub-blue/10 text-csub-blue-dark rounded-full px-2 py-0.5 font-body font-semibold">
+                  Student ID # {studentProfile.emplid}
+                </span>
+              )}
+              {studentProfile?.applicant_type && (
+                <span className="text-[10px] bg-gray-100 text-csub-blue-dark rounded-full px-2 py-0.5 font-body font-semibold">
+                  {studentProfile.applicant_type}
+                </span>
+              )}
+              {studentProfile?.residency && (
+                <span className="text-[10px] bg-gray-100 text-csub-blue-dark rounded-full px-2 py-0.5 font-body font-semibold">
+                  {studentProfile.residency}
+                </span>
+              )}
+            </div>
+            {studentProfile?.created_at && (
+              <p className="font-body text-xs text-csub-gray mt-1">
+                Registered {displayDate(studentProfile.created_at)}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Tags */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
+              Imported Profile
+            </h3>
+          </div>
+          {studentProfile?.last_synced_at && (
+            <span className="font-body text-[10px] text-csub-gray bg-gray-100 rounded-full px-2 py-1">
+              Synced {displayDate(studentProfile.last_synced_at, true)}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {PROFILE_FIELDS.map((field) => (
+            <div key={field.key} className="bg-gray-50 rounded-lg px-3 py-3 border border-gray-200">
+              <p className="font-body text-[10px] uppercase tracking-wide text-csub-gray">{field.label}</p>
+              <p className="font-body text-sm text-csub-blue-dark mt-1 break-words">
+                {studentProfile?.[field.key] || 'Not set'}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {canEdit && (
         <div className="mb-5">
-          <label className="font-body text-xs font-semibold text-csub-blue-dark block mb-1">Student Tags</label>
+          <label className="font-body text-xs font-semibold text-csub-blue-dark block mb-1">Manual Tags</label>
           <TagEditor tags={studentTags} onChange={saveTags} />
         </div>
       )}
 
-      {/* Progress bar */}
+      {derivedTags.length > 0 && (
+        <div className="mb-5">
+          <label className="font-body text-xs font-semibold text-csub-blue-dark block mb-2">Derived Tags</label>
+          <div className="flex flex-wrap gap-1">
+            {derivedTags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center bg-amber-50 text-amber-800 text-xs font-body font-semibold px-2 py-1 rounded-full"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mb-5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="font-body text-xs text-csub-blue-dark font-semibold">
@@ -129,7 +220,6 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
         </div>
       </div>
 
-      {/* Steps checklist */}
       <div className="flex items-center gap-3 mb-3">
         <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
           Steps
@@ -157,7 +247,6 @@ export default function StudentDetail({ student, steps, api, role = 'viewer', on
         })}
       </div>
 
-      {/* Audit history */}
       <div className="flex items-center gap-3 mb-3">
         <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
           Recent Activity

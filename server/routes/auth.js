@@ -7,6 +7,10 @@ const router = Router();
 // POST /api/auth/dev-login - Dev/POC login (no Azure AD required)
 // Accepts { name, email } and returns a JWT token
 router.post('/dev-login', (req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== 'true') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   const { name, email } = req.body;
 
   if (!name || !email) {
