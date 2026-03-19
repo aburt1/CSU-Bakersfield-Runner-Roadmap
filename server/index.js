@@ -19,6 +19,9 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Trust the first proxy (needed behind reverse proxies like Nginx, Traefik, etc.)
+app.set('trust proxy', 1);
 let db = null;
 
 process.on('unhandledRejection', (error) => {
