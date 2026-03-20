@@ -21,7 +21,10 @@
       "Bash(grep -r @media /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src --include=*.css --include=*.jsx --include=*.js)",
       "Bash(grep -o \"sm:\\\\|md:\\\\|lg:\\\\|xl:\\\\|2xl:\" /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src/components/roadmap/*.jsx)",
       "Bash(grep -r \"sm:\\\\|md:\\\\|lg:\\\\|xl:\\\\|2xl:\" /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src/pages/admin/*.jsx)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(grep -E \"\\\\.jsx$\")",
+      "Bash(ls -la /Users/aburt1/Desktop/roadmap/CSUB-admissions/server/*.js)",
+      "WebFetch(domain:kuali.zendesk.com)"
     ]
   }
 }
