@@ -105,6 +105,16 @@ async function startServer() {
     server.on('error', (error) => {
       console.error('[server-error]', error);
     });
+
+    // Graceful shutdown
+    const shutdown = async (signal) => {
+      console.log(`\n[shutdown] Received ${signal}, closing...`);
+      server.close();
+      if (db) await db.end();
+      process.exit(0);
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (error) {
     console.error('[startup-error] Failed to start server', error);
     process.exit(1);

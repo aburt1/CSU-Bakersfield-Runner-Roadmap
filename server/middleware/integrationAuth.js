@@ -12,20 +12,21 @@ function getIntegrationCredential(req) {
   return null;
 }
 
-export function integrationAuth(req, res, next) {
+export async function integrationAuth(req, res, next) {
   const credential = getIntegrationCredential(req);
   if (!credential) {
     return res.status(401).json({ error: 'Integration authentication required' });
   }
 
-  const clients = req.db.prepare(`
-    SELECT id, name, key_hash, is_active
-    FROM integration_clients
-    WHERE is_active = 1
-  `).all();
+  const clients = await req.db.queryAll(
+    `SELECT id, name, key_hash, is_active
+     FROM integration_clients
+     WHERE is_active = 1`
+  );
 
   for (const client of clients) {
-    if (bcrypt.compareSync(credential, client.key_hash)) {
+    const match = await bcrypt.compare(credential, client.key_hash);
+    if (match) {
       req.integrationClient = {
         id: client.id,
         name: client.name,

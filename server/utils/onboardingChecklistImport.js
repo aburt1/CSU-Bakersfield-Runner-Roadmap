@@ -23,9 +23,9 @@ export function getFall2026ChecklistManifest() {
   return readChecklistManifest();
 }
 
-export function importFall2026Checklist(db, termId, { deactivateUnmatched = true } = {}) {
+export async function importFall2026Checklist(db, termId, { deactivateUnmatched = true } = {}) {
   const manifest = readChecklistManifest();
-  const existingSteps = db.prepare('SELECT * FROM steps WHERE term_id = ? ORDER BY sort_order, id').all(termId);
+  const existingSteps = await db.queryAll('SELECT * FROM steps WHERE term_id = $1 ORDER BY sort_order, id', [termId]);
   const updatedIds = new Set();
   const report = {
     inserted: [],
@@ -34,37 +34,7 @@ export function importFall2026Checklist(db, termId, { deactivateUnmatched = true
     steps: [],
   };
 
-  const selectById = db.prepare('SELECT * FROM steps WHERE id = ?');
-  const insertStep = db.prepare(`
-    INSERT INTO steps (
-      title, description, icon, sort_order, deadline, deadline_date, guide_content,
-      required_tags, required_tag_mode, excluded_tags, contact_info, links,
-      term_id, step_key, is_active, is_public, is_optional
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-  `);
-  const updateStep = db.prepare(`
-    UPDATE steps
-    SET
-      title = ?,
-      description = ?,
-      icon = ?,
-      sort_order = ?,
-      deadline = ?,
-      deadline_date = ?,
-      guide_content = ?,
-      required_tags = ?,
-      required_tag_mode = ?,
-      excluded_tags = ?,
-      contact_info = ?,
-      links = ?,
-      step_key = ?,
-      is_public = ?,
-      is_optional = ?,
-      is_active = 1
-    WHERE id = ?
-  `);
-
-  const importTxn = db.transaction(() => {
+  return await db.transaction(async (txDb) => {
     for (const item of manifest) {
       const existing = existingSteps.find((step) => {
         if (step.step_key && step.step_key === item.step_key) return true;
@@ -90,35 +60,52 @@ export function importFall2026Checklist(db, termId, { deactivateUnmatched = true
         item.is_optional ? 1 : 0,
       ];
 
-      const insertValues = [
-        ...updateValues.slice(0, 12),
-        termId,
-        ...updateValues.slice(12),
-      ];
-
       if (existing) {
-        updateStep.run(...updateValues, existing.id);
+        await txDb.execute(
+          `UPDATE steps
+           SET title = $1, description = $2, icon = $3, sort_order = $4,
+               deadline = $5, deadline_date = $6, guide_content = $7,
+               required_tags = $8, required_tag_mode = $9, excluded_tags = $10,
+               contact_info = $11, links = $12, step_key = $13,
+               is_public = $14, is_optional = $15, is_active = 1
+           WHERE id = $16`,
+          [...updateValues, existing.id]
+        );
         updatedIds.add(existing.id);
         report.updated.push(item.step_key);
-        report.steps.push(selectById.get(existing.id));
+        const updatedRow = await txDb.queryOne('SELECT * FROM steps WHERE id = $1', [existing.id]);
+        report.steps.push(updatedRow);
       } else {
-        const result = insertStep.run(...insertValues);
-        updatedIds.add(result.lastInsertRowid);
+        const result = await txDb.execute(
+          `INSERT INTO steps (
+            title, description, icon, sort_order, deadline, deadline_date, guide_content,
+            required_tags, required_tag_mode, excluded_tags, contact_info, links,
+            term_id, step_key, is_active, is_public, is_optional
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1, $15, $16)
+          RETURNING id`,
+          [
+            ...updateValues.slice(0, 12),
+            termId,
+            ...updateValues.slice(12),
+          ]
+        );
+        const newId = result.rows[0].id;
+        updatedIds.add(newId);
         report.inserted.push(item.step_key);
-        report.steps.push(selectById.get(result.lastInsertRowid));
+        const insertedRow = await txDb.queryOne('SELECT * FROM steps WHERE id = $1', [newId]);
+        report.steps.push(insertedRow);
       }
     }
 
     if (deactivateUnmatched) {
       for (const step of existingSteps) {
         if (!updatedIds.has(step.id) && step.is_active !== 0) {
-          db.prepare('UPDATE steps SET is_active = 0 WHERE id = ?').run(step.id);
+          await txDb.execute('UPDATE steps SET is_active = 0 WHERE id = $1', [step.id]);
           report.deactivated.push(step.step_key || step.title);
         }
       }
     }
-  });
 
-  importTxn();
-  return report;
+    return report;
+  });
 }

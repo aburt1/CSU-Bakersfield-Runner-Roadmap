@@ -17,19 +17,19 @@ async function main() {
 
   let term = null;
   if (termIdArg) {
-    term = db.prepare('SELECT id, name FROM terms WHERE id = ?').get(parseInt(termIdArg, 10));
+    term = await db.queryOne('SELECT id, name FROM terms WHERE id = $1', [parseInt(termIdArg, 10)]);
   } else if (termNameArg) {
-    term = db.prepare('SELECT id, name FROM terms WHERE name = ?').get(termNameArg);
+    term = await db.queryOne('SELECT id, name FROM terms WHERE name = $1', [termNameArg]);
   } else {
-    term = db.prepare('SELECT id, name FROM terms WHERE name = ?').get('Fall 2026')
-      || db.prepare('SELECT id, name FROM terms WHERE is_active = 1 ORDER BY id DESC LIMIT 1').get();
+    term = await db.queryOne('SELECT id, name FROM terms WHERE name = $1', ['Fall 2026'])
+      || await db.queryOne('SELECT id, name FROM terms WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
   }
 
   if (!term) {
     throw new Error('No matching term found. Use --term-id or --term-name.');
   }
 
-  const report = importFall2026Checklist(db, term.id, { deactivateUnmatched: true });
+  const report = await importFall2026Checklist(db, term.id, { deactivateUnmatched: true });
   console.log(`Imported Fall 2026 onboarding checklist into term "${term.name}" (${term.id})`);
   console.log(`Updated: ${report.updated.length}`);
   console.log(`Inserted: ${report.inserted.length}`);
@@ -41,6 +41,8 @@ async function main() {
       console.log(`- ${item}`);
     }
   }
+
+  await db.end();
 }
 
 main().catch((error) => {

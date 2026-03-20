@@ -30,22 +30,21 @@ export function createUniqueKey(baseKey, usedKeys) {
   return candidate;
 }
 
-export function getUniqueStepKeyForTerm(db, termId, { stepKey, title, fallback, excludeStepId } = {}) {
+export async function getUniqueStepKeyForTerm(db, termId, { stepKey, title, fallback, excludeStepId } = {}) {
   const base = buildStepKeyBase({ stepKey, title, fallback });
   const rows = excludeStepId
-    ? db.prepare('SELECT step_key FROM steps WHERE term_id = ? AND id != ? AND step_key IS NOT NULL').all(termId, excludeStepId)
-    : db.prepare('SELECT step_key FROM steps WHERE term_id = ? AND step_key IS NOT NULL').all(termId);
+    ? await db.queryAll('SELECT step_key FROM steps WHERE term_id = $1 AND id != $2 AND step_key IS NOT NULL', [termId, excludeStepId])
+    : await db.queryAll('SELECT step_key FROM steps WHERE term_id = $1 AND step_key IS NOT NULL', [termId]);
   const usedKeys = new Set(rows.map((row) => row.step_key).filter(Boolean));
   return createUniqueKey(base, usedKeys);
 }
 
-export function ensureStepKeys(db) {
-  const steps = db.prepare(`
+export async function ensureStepKeys(db) {
+  const steps = await db.queryAll(`
     SELECT id, title, term_id, step_key
     FROM steps
     ORDER BY COALESCE(term_id, 0), sort_order, id
-  `).all();
-  const update = db.prepare('UPDATE steps SET step_key = ? WHERE id = ?');
+  `);
   const usedByTerm = new Map();
 
   for (const step of steps) {
@@ -63,7 +62,7 @@ export function ensureStepKeys(db) {
     usedByTerm.set(termKey, usedKeys);
 
     if (step.step_key !== nextKey) {
-      update.run(nextKey, step.id);
+      await db.execute('UPDATE steps SET step_key = $1 WHERE id = $2', [nextKey, step.id]);
     }
   }
 }

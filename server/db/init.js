@@ -1,148 +1,145 @@
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { createDb } from './pool.js';
 import { importFall2026Checklist } from '../utils/onboardingChecklistImport.js';
 import { ensureStepKeys } from '../utils/stepKeys.js';
 
-const DB_PATH = process.env.DB_PATH || './data/admissions.db';
-
 export async function initDatabase() {
-  // Ensure data directory exists
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-
-  const db = new Database(DB_PATH);
-
-  // Enable WAL mode for better concurrent read performance
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  const db = createDb();
 
   // Create tables
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS students (
       id TEXT PRIMARY KEY,
       display_name TEXT,
       email TEXT,
       azure_id TEXT UNIQUE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS steps (
-      id INTEGER PRIMARY KEY,
+      id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT,
       icon TEXT,
       sort_order INTEGER NOT NULL,
       deadline TEXT
-    );
+    )
+  `);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS student_progress (
       student_id TEXT NOT NULL,
       step_id INTEGER NOT NULL,
-      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (student_id, step_id),
       FOREIGN KEY (student_id) REFERENCES students(id),
       FOREIGN KEY (step_id) REFERENCES steps(id)
-    );
+    )
+  `);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS audit_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       entity_type TEXT NOT NULL,
       entity_id TEXT NOT NULL,
       action TEXT NOT NULL,
       changed_by TEXT NOT NULL,
       details TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
-    CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
   `);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)`);
 
   // Migrations — add new columns (safe to re-run)
   const migrations = [
-    'ALTER TABLE steps ADD COLUMN guide_content TEXT',
-    'ALTER TABLE steps ADD COLUMN links TEXT',
-    'ALTER TABLE steps ADD COLUMN required_tags TEXT',
-    "ALTER TABLE steps ADD COLUMN required_tag_mode TEXT DEFAULT 'any'",
-    'ALTER TABLE steps ADD COLUMN excluded_tags TEXT',
-    'ALTER TABLE steps ADD COLUMN is_active INTEGER DEFAULT 1',
-    'ALTER TABLE students ADD COLUMN tags TEXT',
-    'ALTER TABLE students ADD COLUMN emplid TEXT',
-    'ALTER TABLE students ADD COLUMN preferred_name TEXT',
-    'ALTER TABLE students ADD COLUMN phone TEXT',
-    'ALTER TABLE students ADD COLUMN applicant_type TEXT',
-    'ALTER TABLE students ADD COLUMN major TEXT',
-    'ALTER TABLE students ADD COLUMN residency TEXT',
-    'ALTER TABLE students ADD COLUMN admit_term TEXT',
-    'ALTER TABLE students ADD COLUMN last_synced_at DATETIME',
-    "ALTER TABLE student_progress ADD COLUMN status TEXT DEFAULT 'completed'",
-    'ALTER TABLE student_progress ADD COLUMN note TEXT',
-    'ALTER TABLE steps ADD COLUMN contact_info TEXT',
-    'ALTER TABLE steps ADD COLUMN term_id INTEGER',
-    'ALTER TABLE steps ADD COLUMN deadline_date TEXT',
-    'ALTER TABLE students ADD COLUMN term_id INTEGER',
-    'ALTER TABLE steps ADD COLUMN is_public INTEGER DEFAULT 0',
-    'ALTER TABLE steps ADD COLUMN step_key TEXT',
-    'ALTER TABLE steps ADD COLUMN is_optional INTEGER DEFAULT 0',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS guide_content TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS links TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS required_tags TEXT',
+    "ALTER TABLE steps ADD COLUMN IF NOT EXISTS required_tag_mode TEXT DEFAULT 'any'",
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS excluded_tags TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS tags TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS emplid TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS preferred_name TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS phone TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS applicant_type TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS major TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS residency TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS admit_term TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ',
+    "ALTER TABLE student_progress ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed'",
+    'ALTER TABLE student_progress ADD COLUMN IF NOT EXISTS note TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS contact_info TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS term_id INTEGER',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS deadline_date TEXT',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS term_id INTEGER',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_public INTEGER DEFAULT 0',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS step_key TEXT',
+    'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_optional INTEGER DEFAULT 0',
   ];
   for (const sql of migrations) {
-    try { db.exec(sql); } catch { /* column already exists */ }
+    await db.execute(sql);
   }
 
   // Create terms table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS terms (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       start_date TEXT,
       end_date TEXT,
       is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
   `);
 
   // Backfill legacy rows after terms exist.
-  const latestTerm = db.prepare('SELECT id FROM terms ORDER BY id DESC LIMIT 1').get();
+  const latestTerm = await db.queryOne('SELECT id FROM terms ORDER BY id DESC LIMIT 1');
   if (latestTerm?.id) {
-    db.prepare('UPDATE steps SET term_id = ? WHERE term_id IS NULL').run(latestTerm.id);
-    db.prepare('UPDATE students SET term_id = ? WHERE term_id IS NULL').run(latestTerm.id);
+    await db.execute('UPDATE steps SET term_id = $1 WHERE term_id IS NULL', [latestTerm.id]);
+    await db.execute('UPDATE students SET term_id = $1 WHERE term_id IS NULL', [latestTerm.id]);
   }
 
   // Seed default term if empty and backfill existing data
-  const termCount = db.prepare('SELECT COUNT(*) as count FROM terms').get();
-  if (termCount.count === 0) {
-    db.prepare(
+  const termCount = await db.queryOne('SELECT COUNT(*) as count FROM terms');
+  if (parseInt(termCount.count) === 0) {
+    await db.execute(
       "INSERT INTO terms (name, start_date, end_date, is_active) VALUES ('Fall 2026', '2026-08-01', '2026-12-31', 1)"
-    ).run();
-    db.prepare('UPDATE steps SET term_id = 1 WHERE term_id IS NULL').run();
-    db.prepare('UPDATE students SET term_id = 1 WHERE term_id IS NULL').run();
+    );
+    await db.execute('UPDATE steps SET term_id = 1 WHERE term_id IS NULL');
+    await db.execute('UPDATE students SET term_id = 1 WHERE term_id IS NULL');
     console.log('Seeded default term: Fall 2026');
   }
 
   // Create admin_users table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS admin_users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'viewer',
       display_name TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS integration_clients (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
       key_hash TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS integration_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       integration_client_id INTEGER NOT NULL,
       source_event_id TEXT NOT NULL,
       student_id_number TEXT,
@@ -150,34 +147,36 @@ export async function initDatabase() {
       request_body TEXT,
       response_status INTEGER NOT NULL,
       response_body TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
       FOREIGN KEY (integration_client_id) REFERENCES integration_clients(id)
-    );
+    )
   `);
 
   // Seed default superadmin if empty
-  const adminCount = db.prepare('SELECT COUNT(*) as count FROM admin_users').get();
-  if (adminCount.count === 0) {
+  const adminCount = await db.queryOne('SELECT COUNT(*) as count FROM admin_users');
+  if (parseInt(adminCount.count) === 0) {
     const bcrypt = await import('bcrypt');
     const email = process.env.ADMIN_DEFAULT_EMAIL || 'admin@csub.edu';
     const password = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
     const hash = await bcrypt.hash(password, 10);
-    db.prepare(
-      'INSERT INTO admin_users (email, password_hash, role, display_name) VALUES (?, ?, ?, ?)'
-    ).run(email, hash, 'sysadmin', 'Admin');
+    await db.execute(
+      'INSERT INTO admin_users (email, password_hash, role, display_name) VALUES ($1, $2, $3, $4)',
+      [email, hash, 'sysadmin', 'Admin']
+    );
     console.log(`Seeded default sysadmin: ${email}`);
   }
 
   // Seed default integration client in dev or when explicitly configured.
-  const integrationCount = db.prepare('SELECT COUNT(*) as count FROM integration_clients').get();
-  if (integrationCount.count === 0 && (process.env.NODE_ENV !== 'production' || process.env.INTEGRATION_DEFAULT_KEY)) {
+  const integrationCount = await db.queryOne('SELECT COUNT(*) as count FROM integration_clients');
+  if (parseInt(integrationCount.count) === 0 && (process.env.NODE_ENV !== 'production' || process.env.INTEGRATION_DEFAULT_KEY)) {
     const bcrypt = await import('bcrypt');
     const clientName = process.env.INTEGRATION_DEFAULT_NAME || 'PeopleSoft Dev';
     const clientKey = process.env.INTEGRATION_DEFAULT_KEY || 'dev-integration-key';
     const keyHash = await bcrypt.hash(clientKey, 10);
-    db.prepare(
-      'INSERT INTO integration_clients (name, key_hash, is_active) VALUES (?, ?, 1)'
-    ).run(clientName, keyHash);
+    await db.execute(
+      'INSERT INTO integration_clients (name, key_hash, is_active) VALUES ($1, $2, 1)',
+      [clientName, keyHash]
+    );
 
     if (process.env.NODE_ENV !== 'production' && !process.env.INTEGRATION_DEFAULT_KEY) {
       console.log(`Seeded default integration client "${clientName}" with key: ${clientKey}`);
@@ -187,51 +186,54 @@ export async function initDatabase() {
   }
 
   // Seed default Fall 2026 checklist if empty
-  const count = db.prepare('SELECT COUNT(*) as count FROM steps').get();
-  if (count.count === 0) {
-    const defaultTerm = db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1').get();
+  const count = await db.queryOne('SELECT COUNT(*) as count FROM steps');
+  if (parseInt(count.count) === 0) {
+    const defaultTerm = await db.queryOne('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1');
     const seedTermId = defaultTerm?.id || null;
     if (seedTermId) {
-      const importResult = importFall2026Checklist(db, seedTermId, { deactivateUnmatched: false });
+      const importResult = await importFall2026Checklist(db, seedTermId, { deactivateUnmatched: false });
       console.log(`Seeded Fall 2026 onboarding checklist (${importResult.steps.length} steps)`);
     }
   }
 
-  ensureStepKeys(db);
+  await ensureStepKeys(db);
 
+  // Create indexes (idempotent)
   try {
-    db.exec(`
+    await db.execute(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_students_emplid_unique
       ON students (lower(trim(emplid)))
-      WHERE emplid IS NOT NULL AND trim(emplid) <> '';
+      WHERE emplid IS NOT NULL AND trim(emplid) <> ''
     `);
   } catch (error) {
     console.warn('[db-init] Unable to create unique Student ID # index:', error.message);
   }
 
-  db.exec(`
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_steps_term_step_key_unique
     ON steps (term_id, step_key)
-    WHERE term_id IS NOT NULL AND step_key IS NOT NULL AND trim(step_key) <> '';
+    WHERE term_id IS NOT NULL AND step_key IS NOT NULL AND trim(step_key) <> ''
+  `);
 
+  await db.execute(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_events_unique
-    ON integration_events (integration_client_id, source_event_id);
+    ON integration_events (integration_client_id, source_event_id)
+  `);
 
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_steps_step_key_lookup
-    ON steps (term_id, step_key);
+    ON steps (term_id, step_key)
   `);
 
   // Seed 50 sample students if empty
-  const studentCount = db.prepare('SELECT COUNT(*) as count FROM students').get();
-  if (studentCount.count === 0) {
-    const defaultTerm = db.prepare('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1').get();
+  const studentCount = await db.queryOne('SELECT COUNT(*) as count FROM students');
+  if (parseInt(studentCount.count) === 0) {
+    const defaultTerm = await db.queryOne('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1');
     const termId = defaultTerm?.id || 1;
-    const stepRows = db.prepare(`
-      SELECT id, sort_order
-      FROM steps
-      WHERE term_id = ? AND COALESCE(is_optional, 0) = 0
-      ORDER BY sort_order
-    `).all(termId);
+    const stepRows = await db.queryAll(
+      `SELECT id, sort_order FROM steps WHERE term_id = $1 AND COALESCE(is_optional, 0) = 0 ORDER BY sort_order`,
+      [termId]
+    );
 
     // Realistic first/last name pools (diverse Central Valley demographics)
     const firstNames = [
@@ -255,55 +257,29 @@ export async function initDatabase() {
 
     const applicantTypes = ['First-Time Freshman', 'Transfer', 'First-Time Freshman', 'Transfer', 'Readmit'];
     const majors = [
-      'Business Administration',
-      'Computer Science',
-      'Psychology',
-      'Nursing',
-      'Mechanical Engineering',
-      'Biology',
-      'Criminal Justice',
-      'Kinesiology',
-      'Sociology',
-      'Liberal Studies',
+      'Business Administration', 'Computer Science', 'Psychology', 'Nursing',
+      'Mechanical Engineering', 'Biology', 'Criminal Justice', 'Kinesiology',
+      'Sociology', 'Liberal Studies',
     ];
     const residencies = ['In-State', 'In-State', 'In-State', 'Out-of-State'];
     const manualTagOptions = [
-      ['first-gen'],
-      ['honors'],
-      ['eop'],
-      ['athlete'],
-      ['veteran'],
-      ['first-gen', 'honors'],
-      [],
-      [],
+      ['first-gen'], ['honors'], ['eop'], ['athlete'], ['veteran'],
+      ['first-gen', 'honors'], [], [],
     ];
 
-    const insertStudent = db.prepare(
-      `INSERT INTO students (
-        id, display_name, email, azure_id, tags, term_id, created_at, emplid,
-        preferred_name, phone, applicant_type, major, residency, admit_term, last_synced_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const insertProgress = db.prepare(
-      'INSERT INTO student_progress (student_id, step_id, completed_at, status) VALUES (?, ?, ?, ?)'
-    );
-
-    // Progression profiles — how far along each student is (realistic distribution)
-    // Most students cluster in the middle steps; a few are very early or fully done
     const progressionWeights = [
-      { stepsCompleted: 0, weight: 2 },   // just accepted, haven't started
+      { stepsCompleted: 0, weight: 2 },
       { stepsCompleted: 1, weight: 3 },
-      { stepsCompleted: 2, weight: 5 },   // activated account
-      { stepsCompleted: 3, weight: 6 },   // submitted intent
-      { stepsCompleted: 4, weight: 7 },   // signed into email
-      { stepsCompleted: 5, weight: 8 },   // registered for orientation
-      { stepsCompleted: 6, weight: 7 },   // attended orientation
-      { stepsCompleted: 7, weight: 5 },   // met advisor
-      { stepsCompleted: 8, weight: 4 },   // moved in
-      { stepsCompleted: 9, weight: 3 },   // all done
+      { stepsCompleted: 2, weight: 5 },
+      { stepsCompleted: 3, weight: 6 },
+      { stepsCompleted: 4, weight: 7 },
+      { stepsCompleted: 5, weight: 8 },
+      { stepsCompleted: 6, weight: 7 },
+      { stepsCompleted: 7, weight: 5 },
+      { stepsCompleted: 8, weight: 4 },
+      { stepsCompleted: 9, weight: 3 },
     ];
 
-    // Build weighted array
     const progressionPool = [];
     for (const p of progressionWeights) {
       for (let i = 0; i < p.weight; i++) {
@@ -311,7 +287,7 @@ export async function initDatabase() {
       }
     }
 
-    const seedStudents = db.transaction(() => {
+    await db.transaction(async (txDb) => {
       for (let i = 0; i < 50; i++) {
         const first = firstNames[i];
         const last = lastNames[i % lastNames.length];
@@ -330,46 +306,39 @@ export async function initDatabase() {
 
         const manualTags = manualTagOptions[i % manualTagOptions.length];
 
-        // Stagger created_at dates over the last 60 days
         const daysAgo = Math.floor(Math.random() * 60) + 1;
         const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
 
-        insertStudent.run(
-          id,
-          name,
-          email,
-          azureId,
-          manualTags.length > 0 ? JSON.stringify(manualTags) : null,
-          termId,
-          createdAt,
-          emplid,
-          preferredName,
-          phone,
-          applicantType,
-          major,
-          residency,
-          admitTerm,
-          lastSyncedAt
+        await txDb.execute(
+          `INSERT INTO students (
+            id, display_name, email, azure_id, tags, term_id, created_at, emplid,
+            preferred_name, phone, applicant_type, major, residency, admit_term, last_synced_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          [
+            id, name, email, azureId,
+            manualTags.length > 0 ? JSON.stringify(manualTags) : null,
+            termId, createdAt, emplid, preferredName, phone,
+            applicantType, major, residency, admitTerm, lastSyncedAt,
+          ]
         );
 
-        // Assign progress based on weighted profile
         const stepsCompleted = progressionPool[i % progressionPool.length];
         const completableSteps = stepRows.slice(0, stepsCompleted);
 
         for (let j = 0; j < completableSteps.length; j++) {
           const step = completableSteps[j];
-          // Completion dates spread out: earlier steps completed earlier
           const completionDaysAgo = daysAgo - j * 2 - Math.floor(Math.random() * 3);
           const completedAt = new Date(Date.now() - Math.max(completionDaysAgo, 1) * 86400000).toISOString();
-
-          // ~5% chance a step is waived instead of completed
           const status = (Math.random() < 0.05) ? 'waived' : 'completed';
-          insertProgress.run(id, step.id, completedAt, status);
+
+          await txDb.execute(
+            'INSERT INTO student_progress (student_id, step_id, completed_at, status) VALUES ($1, $2, $3, $4)',
+            [id, step.id, completedAt, status]
+          );
         }
       }
     });
 
-    seedStudents();
     console.log('Seeded 50 sample students with realistic progress');
   }
 

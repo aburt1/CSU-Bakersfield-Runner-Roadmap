@@ -8,15 +8,16 @@ export function getAuditActor(req) {
   return 'system';
 }
 
-export function logAudit(db, req, { entityType, entityId, action, details }) {
-  db.prepare(`
-    INSERT INTO audit_log (entity_type, entity_id, action, changed_by, details)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(
-    entityType,
-    String(entityId),
-    action,
-    getAuditActor(req),
-    details ? JSON.stringify(details) : null
+export async function logAudit(db, req, { entityType, entityId, action, details }) {
+  await db.execute(
+    `INSERT INTO audit_log (entity_type, entity_id, action, changed_by, details)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      entityType,
+      String(entityId),
+      action,
+      getAuditActor(req),
+      details ? JSON.stringify(details) : null,
+    ]
   );
 }
