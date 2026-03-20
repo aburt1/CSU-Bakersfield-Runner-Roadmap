@@ -14,7 +14,7 @@ export default function CurrentStepCallout({ step, stepNumber, onViewDetails }) 
     >
       <div className="bg-white rounded-xl border-2 border-csub-blue shadow-lg overflow-hidden">
         {/* Blue accent bar */}
-        <div className="h-1.5 bg-gradient-to-r from-csub-blue to-csub-gold" />
+        <div className="h-1.5 bg-gradient-to-r from-csub-blue to-csub-gold" aria-hidden="true" />
 
         <div className="p-5 sm:p-6">
           <div className="flex items-start gap-4">
@@ -60,6 +60,7 @@ export default function CurrentStepCallout({ step, stepNumber, onViewDetails }) 
                 )}
                 <button
                   onClick={onViewDetails}
+                  aria-label={`View details for ${step.title}`}
                   className="inline-flex items-center gap-1.5 font-body text-sm font-semibold text-csub-blue hover:text-csub-blue-dark transition-colors"
                 >
                   View details

@@ -33,6 +33,23 @@ export default function StepDetailPanel({
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft' && hasPrev) onNavigate('prev');
       if (e.key === 'ArrowRight' && hasNext) onNavigate('next');
+
+      // Focus trap: keep Tab within the dialog
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = panelRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
@@ -72,7 +89,7 @@ export default function StepDetailPanel({
         className="relative bg-white w-full sm:max-w-lg sm:rounded-xl rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto focus:outline-none"
       >
         {/* Status accent bar */}
-        <div className={`h-1.5 ${
+        <div aria-hidden="true" className={`h-1.5 ${
           step.status === 'completed' ? 'bg-gradient-to-r from-csub-gold to-amber-300' :
           step.status === 'in_progress' ? 'bg-gradient-to-r from-csub-blue to-blue-400' :
           'bg-gray-200'
@@ -86,7 +103,7 @@ export default function StepDetailPanel({
               <button
                 onClick={() => onNavigate('prev')}
                 disabled={!hasPrev}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-csub-blue hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-2.5 rounded-lg text-gray-400 hover:text-csub-blue hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="Previous step"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -99,7 +116,7 @@ export default function StepDetailPanel({
               <button
                 onClick={() => onNavigate('next')}
                 disabled={!hasNext}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-csub-blue hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-2.5 rounded-lg text-gray-400 hover:text-csub-blue hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next step"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -109,7 +126,7 @@ export default function StepDetailPanel({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-csub-blue-dark hover:bg-gray-100 transition-colors"
+              className="p-2.5 rounded-lg text-gray-400 hover:text-csub-blue-dark hover:bg-gray-100 transition-colors"
               aria-label="Close details"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

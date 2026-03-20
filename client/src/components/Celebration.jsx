@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
 /* Inline SVG shield in CSUB blue/gold — resembles the university crest shape */
 function CsubShield() {
   return (
-    <svg width="80" height="96" viewBox="0 0 80 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="80" height="96" viewBox="0 0 80 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       {/* Shield body */}
       <path
         d="M40 2 L76 16 L76 52 C76 72 60 88 40 94 C20 88 4 72 4 52 L4 16 Z"
@@ -43,7 +43,14 @@ function CsubShield() {
 }
 
 export default function Celebration({ onClose }) {
+  const dialogRef = useRef(null);
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Confetti animation — skip if user prefers reduced motion
   useEffect(() => {
+    if (prefersReducedMotion) return;
+
     const duration = 3000;
     const end = Date.now() + duration;
     const csubColors = ['#003594', '#FFC72C', '#ffffff'];
@@ -72,28 +79,61 @@ export default function Celebration({ onClose }) {
     frame();
   }, []);
 
+  // Focus trap + keyboard dismiss
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    dialogRef.current?.focus();
+
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-csub-blue-dark/60 backdrop-blur-sm"
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Celebration — all steps complete"
+      initial={prefersReducedMotion ? false : { opacity: 0 }}
+      animate={prefersReducedMotion ? false : { opacity: 1 }}
+      exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-csub-blue-dark/60 backdrop-blur-sm focus:outline-none"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.8, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+        initial={prefersReducedMotion ? false : { scale: 0.8, opacity: 0 }}
+        animate={prefersReducedMotion ? false : { scale: 1, opacity: 1 }}
+        exit={prefersReducedMotion ? undefined : { scale: 0.8, opacity: 0 }}
+        transition={prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 200, damping: 18 }}
         className="bg-white rounded-2xl p-8 md:p-12 max-w-md mx-4 text-center shadow-2xl border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Shield crest */}
         <div className="flex justify-center mb-6">
           <motion.div
-            initial={{ y: -20 }}
-            animate={{ y: 0 }}
-            transition={{ delay: 0.2, type: 'spring' }}
+            initial={prefersReducedMotion ? false : { y: -20 }}
+            animate={prefersReducedMotion ? false : { y: 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.2, type: 'spring' }}
           >
             <CsubShield />
           </motion.div>
@@ -103,7 +143,7 @@ export default function Celebration({ onClose }) {
           Congratulations!
         </h2>
 
-        <div className="w-16 h-0.5 bg-csub-gold mx-auto my-4" />
+        <div className="w-16 h-0.5 bg-csub-gold mx-auto my-4" aria-hidden="true" />
 
         <p className="font-body text-base text-csub-gray mb-1">
           All steps complete. You are officially ready for

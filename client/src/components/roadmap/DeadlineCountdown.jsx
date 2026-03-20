@@ -33,7 +33,7 @@ export default function DeadlineCountdown({ deadlineDate, status }) {
 
   return (
     <span
-      className={`inline-flex items-center text-[10px] font-body font-semibold rounded-full px-2 py-0.5 border ${styles[info.level]}`}
+      className={`inline-flex items-center text-xs font-body font-semibold rounded-full px-2 py-0.5 border ${styles[info.level]}`}
       aria-live="polite"
     >
       {info.level === 'overdue' && (

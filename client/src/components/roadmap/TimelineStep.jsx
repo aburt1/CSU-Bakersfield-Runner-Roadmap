@@ -77,7 +77,7 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
       <div className="absolute left-3 sm:left-3.5 top-1 z-10">
         <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${config.nodeClass}`}>
           {config.icon || (
-            <span className="text-[10px] sm:text-xs">{index + 1}</span>
+            <span className="text-xs">{index + 1}</span>
           )}
         </div>
       </div>
@@ -99,7 +99,7 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
           ${config.cardClass}
           ${isActive ? 'ring-1 ring-csub-blue/20' : ''}
         `}
-        aria-expanded="false"
+        aria-haspopup="dialog"
       >
         <div className="flex items-start gap-3">
           {/* Icon */}
@@ -119,7 +119,7 @@ export default function TimelineStep({ step, index, completedAt, isLast, onSelec
                   {step.title}
                 </h3>
                 {step.is_optional === 1 && (
-                  <span className="inline-flex mt-1 text-[10px] font-body font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2 py-0.5">
+                  <span className="inline-flex mt-1 text-xs font-body font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2 py-0.5">
                     Optional
                   </span>
                 )}

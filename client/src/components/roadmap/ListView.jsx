@@ -48,7 +48,7 @@ export default function ListView({ steps, completedDates, onSelectStep }) {
             >
               {/* Status circle */}
               <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${config.iconClass}`}>
-                {config.icon || <span className="text-[10px]">{index + 1}</span>}
+                {config.icon || <span className="text-xs">{index + 1}</span>}
               </div>
 
               {/* Icon */}
@@ -62,21 +62,21 @@ export default function ListView({ steps, completedDates, onSelectStep }) {
                   {step.title}
                 </p>
                 {step.is_optional === 1 && (
-                  <span className="inline-flex mt-1 text-[10px] font-body font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2 py-0.5">
+                  <span className="inline-flex mt-1 text-xs font-body font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2 py-0.5">
                     Optional
                   </span>
                 )}
               </div>
 
               {/* Badges */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                 {step.deadline && (
                   <span className="hidden sm:inline text-xs font-body font-medium text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">
                     {step.deadline}
                   </span>
                 )}
                 <DeadlineCountdown deadlineDate={step.deadline_date} status={step.status} />
-                <span className={`text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${config.badgeClass}`}>
+                <span className={`hidden sm:inline text-xs font-body font-semibold rounded-full px-2.5 py-0.5 ${config.badgeClass}`}>
                   {config.badgeLabel}
                 </span>
               </div>

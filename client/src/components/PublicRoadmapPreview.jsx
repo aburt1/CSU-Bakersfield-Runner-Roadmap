@@ -44,9 +44,9 @@ export default function PublicRoadmapPreview({ onLogin }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Loading">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-csub-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-4 border-csub-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" aria-hidden="true" />
           <p className="text-csub-blue font-display text-lg font-semibold uppercase tracking-wider">
             Loading...
           </p>
@@ -61,10 +61,11 @@ export default function PublicRoadmapPreview({ onLogin }) {
       <p className="font-body text-sm font-semibold text-csub-blue-dark mb-3">
         Activated your CSUB account? Sign in to track your progress.
       </p>
-      <form onSubmit={handleLogin} className="flex flex-wrap items-end gap-3">
+      <form onSubmit={handleLogin} className="flex flex-wrap items-end gap-3" aria-describedby={loginError ? 'login-error' : undefined}>
         <div className="flex-1 min-w-[120px]">
-          <label className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Name</label>
+          <label htmlFor="login-name" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Name</label>
           <input
+            id="login-name"
             type="text"
             required
             value={loginName}
@@ -74,8 +75,9 @@ export default function PublicRoadmapPreview({ onLogin }) {
           />
         </div>
         <div className="flex-1 min-w-[160px]">
-          <label className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Email</label>
+          <label htmlFor="login-email" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Email</label>
           <input
+            id="login-email"
             type="email"
             required
             value={loginEmail}
@@ -93,7 +95,7 @@ export default function PublicRoadmapPreview({ onLogin }) {
         </button>
       </form>
       {loginError && (
-        <p className="text-red-600 text-sm font-body mt-2">{loginError}</p>
+        <p id="login-error" role="alert" className="text-red-600 text-sm font-body mt-2">{loginError}</p>
       )}
     </div>
   );

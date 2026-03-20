@@ -81,6 +81,32 @@ body {
 [data-high-contrast="true"] .text-white\/50,
 [data-high-contrast="true"] .text-white\/60 { color: rgba(255,255,255,0.85) !important; }
 
+/* Reduce motion for users with vestibular disorders.
+   Uses 0.01ms (not 0s) so animationend events still fire. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Screen-reader-only content (supplements Tailwind's sr-only for non-utility usage) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* Print styles */
 @media print {
   nav, button, .no-print, header { display: none !important; }

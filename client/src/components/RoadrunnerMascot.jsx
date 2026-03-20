@@ -1,19 +1,20 @@
 import { motion } from 'framer-motion';
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export default function RoadrunnerMascot({ className = '' }) {
+  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
+  const motionProps = prefersReducedMotion
+    ? {}
+    : {
+        animate: { y: [0, -6, 0], rotate: [0, -3, 0, 3, 0] },
+        transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+      };
+
   return (
-    <motion.div
-      className={`inline-block ${className}`}
-      animate={{
-        y: [0, -6, 0],
-        rotate: [0, -3, 0, 3, 0],
-      }}
-      transition={{
-        duration: 2,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
-    >
+    <Wrapper className={`inline-block ${className}`} {...motionProps} aria-hidden="true">
       <svg
         width="48"
         height="48"
@@ -58,6 +59,6 @@ export default function RoadrunnerMascot({ className = '' }) {
         {/* Wing */}
         <ellipse cx="24" cy="34" rx="8" ry="5" fill="#0047B3" transform="rotate(-15, 24, 34)" />
       </svg>
-    </motion.div>
+    </Wrapper>
   );
 }

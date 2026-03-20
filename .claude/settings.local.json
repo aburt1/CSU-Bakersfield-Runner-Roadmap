@@ -9,7 +9,19 @@
       "WebFetch(domain:www.csub.edu)",
       "WebSearch",
       "Bash(npm install:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(brew --version)",
+      "Bash(brew install:*)",
+      "Bash(brew services:*)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/createdb csub_admissions)",
+      "Bash(npm run:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(lsof -ti:3001)",
+      "Bash(grep -r @media /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src --include=*.css --include=*.jsx --include=*.js)",
+      "Bash(grep -o \"sm:\\\\|md:\\\\|lg:\\\\|xl:\\\\|2xl:\" /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src/components/roadmap/*.jsx)",
+      "Bash(grep -r \"sm:\\\\|md:\\\\|lg:\\\\|xl:\\\\|2xl:\" /Users/aburt1/Desktop/roadmap/CSUB-admissions/client/src/pages/admin/*.jsx)",
+      "Bash(npx vite:*)"
     ]
   }
 }

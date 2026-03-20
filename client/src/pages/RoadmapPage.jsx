@@ -105,9 +105,9 @@ export default function RoadmapPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Loading your roadmap">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-csub-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-4 border-csub-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" aria-hidden="true" />
           <p className="text-csub-blue font-display text-lg font-semibold uppercase tracking-wider">
             Loading your roadmap...
           </p>
@@ -239,7 +239,7 @@ export default function RoadmapPage() {
                 type="checkbox"
                 checked={showOnlyIncomplete}
                 onChange={(e) => setShowOnlyIncomplete(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-csub-blue focus:ring-csub-blue"
+                className="w-5 h-5 rounded border-gray-300 text-csub-blue focus:ring-csub-blue"
               />
               <span className="font-body text-xs text-csub-gray">Incomplete only</span>
             </label>
@@ -248,7 +248,7 @@ export default function RoadmapPage() {
             <div className="flex bg-gray-100 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('timeline')}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-2.5 rounded-md transition-colors ${
                   viewMode === 'timeline' ? 'bg-white shadow-sm text-csub-blue' : 'text-gray-400 hover:text-gray-600'
                 }`}
                 aria-label="Timeline view"
@@ -263,7 +263,7 @@ export default function RoadmapPage() {
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-2.5 rounded-md transition-colors ${
                   viewMode === 'list' ? 'bg-white shadow-sm text-csub-blue' : 'text-gray-400 hover:text-gray-600'
                 }`}
                 aria-label="List view"
