@@ -24,12 +24,13 @@ const ERROR_STATUS = {
   duplicate_student_id_number: 409,
 };
 
-function getStoredIntegrationEvent(db, integrationClientId, sourceEventId) {
-  const row = db.prepare(`
-    SELECT response_status, response_body
-    FROM integration_events
-    WHERE integration_client_id = ? AND source_event_id = ?
-  `).get(integrationClientId, sourceEventId);
+async function getStoredIntegrationEvent(db, integrationClientId, sourceEventId) {
+  const row = await db.queryOne(
+    `SELECT response_status, response_body
+     FROM integration_events
+     WHERE integration_client_id = $1 AND source_event_id = $2`,
+    [integrationClientId, sourceEventId]
+  );
 
   if (!row) return null;
 
@@ -39,10 +40,10 @@ function getStoredIntegrationEvent(db, integrationClientId, sourceEventId) {
   };
 }
 
-function storeIntegrationEvent(db, integrationClientId, sourceEventId, item, outcome) {
+async function storeIntegrationEvent(db, integrationClientId, sourceEventId, item, outcome) {
   try {
-    db.prepare(`
-      INSERT INTO integration_events (
+    await db.execute(
+      `INSERT INTO integration_events (
         integration_client_id,
         source_event_id,
         student_id_number,
@@ -50,20 +51,21 @@ function storeIntegrationEvent(db, integrationClientId, sourceEventId, item, out
         request_body,
         response_status,
         response_body
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      integrationClientId,
-      sourceEventId,
-      normalizeStudentIdNumber(item.student_id_number) || null,
-      normalizeStepKey(item.step_key) || null,
-      JSON.stringify(item),
-      outcome.httpStatus,
-      JSON.stringify(outcome.body)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        integrationClientId,
+        sourceEventId,
+        normalizeStudentIdNumber(item.student_id_number) || null,
+        normalizeStepKey(item.step_key) || null,
+        JSON.stringify(item),
+        outcome.httpStatus,
+        JSON.stringify(outcome.body),
+      ]
     );
 
     return outcome;
   } catch {
-    return getStoredIntegrationEvent(db, integrationClientId, sourceEventId) || outcome;
+    return await getStoredIntegrationEvent(db, integrationClientId, sourceEventId) || outcome;
   }
 }
 
@@ -81,12 +83,12 @@ function buildFailure(item, error, code, extra = {}) {
   };
 }
 
-function finalizeOutcome(req, item, outcome, { persist = true } = {}) {
+async function finalizeOutcome(req, item, outcome, { persist = true } = {}) {
   if (!persist || !item?.source_event_id) {
     return outcome;
   }
 
-  return storeIntegrationEvent(
+  return await storeIntegrationEvent(
     req.db,
     req.integrationClient.id,
     item.source_event_id,
@@ -95,7 +97,7 @@ function finalizeOutcome(req, item, outcome, { persist = true } = {}) {
   );
 }
 
-function processCompletionItem(req, item) {
+async function processCompletionItem(req, item) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     return {
       httpStatus: 400,
@@ -111,7 +113,7 @@ function processCompletionItem(req, item) {
     };
   }
 
-  const storedEvent = getStoredIntegrationEvent(req.db, req.integrationClient.id, sourceEventId);
+  const storedEvent = await getStoredIntegrationEvent(req.db, req.integrationClient.id, sourceEventId);
   if (storedEvent) {
     return storedEvent;
   }
@@ -123,18 +125,18 @@ function processCompletionItem(req, item) {
     };
   }
 
-  const studentResolution = resolveStudentByStudentIdNumber(req.db, item.student_id_number);
+  const studentResolution = await resolveStudentByStudentIdNumber(req.db, item.student_id_number);
   if (studentResolution.error) {
-    return finalizeOutcome(req, item, {
+    return await finalizeOutcome(req, item, {
       httpStatus: ERROR_STATUS[studentResolution.errorCode] || 400,
       body: buildFailure(item, studentResolution.error, studentResolution.errorCode),
     });
   }
 
   const { student, studentIdNumber } = studentResolution;
-  const stepResolution = resolveStepForStudentByKey(req.db, student, item.step_key);
+  const stepResolution = await resolveStepForStudentByKey(req.db, student, item.step_key);
   if (stepResolution.error) {
-    return finalizeOutcome(req, item, {
+    return await finalizeOutcome(req, item, {
       httpStatus: ERROR_STATUS[stepResolution.errorCode] || 400,
       body: buildFailure(item, stepResolution.error, stepResolution.errorCode, {
         student_id: student.id,
@@ -143,7 +145,7 @@ function processCompletionItem(req, item) {
   }
 
   const { step, stepKey } = stepResolution;
-  const progressChange = applyStudentProgressChange(req.db, {
+  const progressChange = await applyStudentProgressChange(req.db, {
     studentId: student.id,
     stepId: step.id,
     status: item.status,
@@ -174,7 +176,7 @@ function processCompletionItem(req, item) {
   };
 
   if (progressChange.result !== 'noop') {
-    logAudit(req.db, req, {
+    await logAudit(req.db, req, {
       entityType: 'student_progress',
       entityId: student.id,
       action: item.status === 'waived'
@@ -196,60 +198,71 @@ function processCompletionItem(req, item) {
     });
   }
 
-  return finalizeOutcome(req, item, {
+  return await finalizeOutcome(req, item, {
     httpStatus: 200,
     body: responseBody,
   });
 }
 
-router.put('/step-completions', (req, res) => {
-  const outcome = processCompletionItem(req, req.body || {});
-  return res.status(outcome.httpStatus).json(outcome.body);
+router.put('/step-completions', async (req, res, next) => {
+  try {
+    const outcome = await processCompletionItem(req, req.body || {});
+    return res.status(outcome.httpStatus).json(outcome.body);
+  } catch (err) { next(err); }
 });
 
-router.post('/step-completions/batch', (req, res) => {
-  const { items } = req.body || {};
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'items must be a non-empty array' });
-  }
+router.post('/step-completions/batch', async (req, res, next) => {
+  try {
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items must be a non-empty array' });
+    }
 
-  const results = items.map((item) => processCompletionItem(req, item).body);
-  const succeeded = results.filter((item) => item.success).length;
-  const failed = results.length - succeeded;
+    const results = [];
+    for (const item of items) {
+      const outcome = await processCompletionItem(req, item);
+      results.push(outcome.body);
+    }
+    const succeeded = results.filter((item) => item.success).length;
+    const failed = results.length - succeeded;
 
-  return res.json({
-    success: true,
-    items: results,
-    summary: {
-      total: results.length,
-      succeeded,
-      failed,
-    },
-  });
+    return res.json({
+      success: true,
+      items: results,
+      summary: {
+        total: results.length,
+        succeeded,
+        failed,
+      },
+    });
+  } catch (err) { next(err); }
 });
 
-router.get('/step-catalog', (req, res) => {
-  const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
-  if (req.query.term_id && !termId) {
-    return res.status(400).json({ error: 'term_id must be a valid number' });
-  }
+router.get('/step-catalog', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+    if (req.query.term_id && !termId) {
+      return res.status(400).json({ error: 'term_id must be a valid number' });
+    }
 
-  const rows = termId
-    ? req.db.prepare(`
-        SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
-        FROM steps s
-        JOIN terms t ON t.id = s.term_id
-        WHERE s.term_id = ?
-        ORDER BY s.sort_order, s.id
-      `).all(termId)
-    : req.db.prepare(`
-        SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
-        FROM steps s
-        JOIN terms t ON t.id = s.term_id
-        ORDER BY t.created_at DESC, s.sort_order, s.id
-      `).all();
+    const rows = termId
+      ? await req.db.queryAll(
+          `SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
+           FROM steps s
+           JOIN terms t ON t.id = s.term_id
+           WHERE s.term_id = $1
+           ORDER BY s.sort_order, s.id`,
+          [termId]
+        )
+      : await req.db.queryAll(
+          `SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
+           FROM steps s
+           JOIN terms t ON t.id = s.term_id
+           ORDER BY t.created_at DESC, s.sort_order, s.id`
+        );
 
-  return res.json(rows);
+    return res.json(rows);
+  } catch (err) { next(err); }
 });
 
 export default router;
