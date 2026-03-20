@@ -17,11 +17,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY server/package*.json ./server/
-RUN cd server && npm ci --omit=dev
-
 COPY --from=build /app/server/ ./server/
 COPY --from=build /app/client/dist/ ./client/dist/
+
+RUN cd server && npm ci --omit=dev
 
 EXPOSE 3001
 

@@ -8,7 +8,8 @@
       "Bash(npm ls react)",
       "WebFetch(domain:www.csub.edu)",
       "WebSearch",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }
