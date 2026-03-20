@@ -4,14 +4,8 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-3001}:3001"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.csub-admissions.rule=Host(`${DOMAIN:-csub-admissions-roadmap.bigpapaburt.com}`)
-      - traefik.http.routers.csub-admissions.entrypoints=https
-      - traefik.http.routers.csub-admissions.tls=true
-      - traefik.http.routers.csub-admissions.tls.certresolver=letsencrypt
-      - traefik.http.services.csub-admissions.loadbalancer.server.port=3001
     environment:
+      - SERVICE_FQDN_APP=https://csub-admissions-roadmap.bigpapaburt.com
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-csub_admissions}
