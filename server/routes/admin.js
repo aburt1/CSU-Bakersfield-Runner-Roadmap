@@ -927,6 +927,292 @@ router.get('/analytics/stalled-students', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/admin/analytics/students?term_id=&filter_type=&filter_value=&page=1&per_page=50
+router.get('/analytics/students', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+    const filterType = req.query.filter_type;
+    const filterValue = req.query.filter_value;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 50));
+    const offset = (page - 1) * perPage;
+
+    if (!termId || !filterType) {
+      return res.status(400).json({ error: 'term_id and filter_type are required' });
+    }
+
+    const totalActiveStepsResult = await req.db.queryOne(
+      'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = $1',
+      [termId]
+    );
+    const totalActiveSteps = parseInt(totalActiveStepsResult.count);
+
+    let studentQuery = '';
+    let countQuery = '';
+    let params = [];
+    let countParams = [];
+    let title = '';
+
+    switch (filterType) {
+      case 'step_completed': {
+        const step = await req.db.queryOne('SELECT title FROM steps WHERE id = $1', [filterValue]);
+        title = `Students who completed ${step?.title || 'this step'}`;
+        params = [filterValue, termId, perPage, offset];
+        countParams = [filterValue, termId];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2
+          ORDER BY st.display_name
+          LIMIT $3 OFFSET $4`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM students st
+          JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2`;
+        break;
+      }
+      case 'step_not_completed': {
+        const step = await req.db.queryOne('SELECT title FROM steps WHERE id = $1', [filterValue]);
+        title = `Students who haven't completed ${step?.title || 'this step'}`;
+        params = [filterValue, termId, perPage, offset];
+        countParams = [filterValue, termId];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          LEFT JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2 AND sp.id IS NULL
+          ORDER BY st.display_name
+          LIMIT $3 OFFSET $4`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM students st
+          LEFT JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2 AND sp.id IS NULL`;
+        break;
+      }
+      case 'cohort_bucket': {
+        title = `Students at ${filterValue} completion`;
+        const bucketRanges = {
+          '0%': [0, 0],
+          '1-25%': [0, 0.25],
+          '26-50%': [0.251, 0.50],
+          '51-75%': [0.501, 0.75],
+          '76-100%': [0.751, 1.0],
+        };
+        const range = bucketRanges[filterValue];
+        if (!range) return res.status(400).json({ error: 'Invalid cohort_bucket value' });
+        const [lo, hi] = range;
+        params = [termId, termId, totalActiveSteps || 1, lo, hi, perPage, offset];
+        countParams = [termId, termId, totalActiveSteps || 1, lo, hi];
+        const bucketCondition = filterValue === '0%'
+          ? "HAVING COALESCE(SUM(CASE WHEN sp.status IN ('completed', 'waived') THEN 1 ELSE 0 END), 0) = 0"
+          : `HAVING (SUM(CASE WHEN sp.status IN ('completed', 'waived') THEN 1 ELSE 0 END)::float / $3) > $4
+             AND (SUM(CASE WHEN sp.status IN ('completed', 'waived') THEN 1 ELSE 0 END)::float / $3) <= $5`;
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          LEFT JOIN student_progress sp ON sp.student_id = st.id
+            AND sp.step_id IN (SELECT id FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = $2)
+          WHERE st.term_id = $1
+          GROUP BY st.id, st.display_name, st.email, st.emplid
+          ${bucketCondition}
+          ORDER BY st.display_name
+          LIMIT $6 OFFSET $7`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM (
+            SELECT st.id
+            FROM students st
+            LEFT JOIN student_progress sp ON sp.student_id = st.id
+              AND sp.step_id IN (SELECT id FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = $2)
+            WHERE st.term_id = $1
+            GROUP BY st.id
+            ${bucketCondition}
+          ) sub`;
+        break;
+      }
+      case 'tag': {
+        title = `${filterValue.charAt(0).toUpperCase() + filterValue.slice(1)} students`;
+        const tagPattern = `%${filterValue}%`;
+        params = [termId, tagPattern, perPage, offset];
+        countParams = [termId, tagPattern];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          WHERE st.term_id = $1 AND st.tags LIKE $2
+          ORDER BY st.display_name
+          LIMIT $3 OFFSET $4`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM students st
+          WHERE st.term_id = $1 AND st.tags LIKE $2`;
+        break;
+      }
+      case 'stalled': {
+        title = `Students stalled ${filterValue}`;
+        const stalledRanges = {
+          '7-14 days': [7, 14],
+          '2-4 weeks': [15, 28],
+          '1-3 months': [29, 90],
+          '3+ months': [91, 99999],
+        };
+        const sRange = stalledRanges[filterValue];
+        if (!sRange) return res.status(400).json({ error: 'Invalid stalled value' });
+        const [minDays, maxDays] = sRange;
+        params = [termId, minDays, maxDays, perPage, offset];
+        countParams = [termId, minDays, maxDays];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          LEFT JOIN student_progress sp ON sp.student_id = st.id
+          WHERE st.term_id = $1
+          GROUP BY st.id, st.display_name, st.email, st.emplid
+          HAVING (
+            COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) = 0
+            AND $2 <= (EXTRACT(DAY FROM NOW() - st.created_at))
+            AND (EXTRACT(DAY FROM NOW() - st.created_at)) <= $3
+          ) OR (
+            MAX(sp.completed_at) IS NOT NULL
+            AND $2 <= EXTRACT(DAY FROM NOW() - MAX(sp.completed_at))
+            AND EXTRACT(DAY FROM NOW() - MAX(sp.completed_at)) <= $3
+          )
+          ORDER BY st.display_name
+          LIMIT $4 OFFSET $5`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM (
+            SELECT st.id
+            FROM students st
+            LEFT JOIN student_progress sp ON sp.student_id = st.id
+            WHERE st.term_id = $1
+            GROUP BY st.id, st.created_at
+            HAVING (
+              COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) = 0
+              AND $2 <= (EXTRACT(DAY FROM NOW() - st.created_at))
+              AND (EXTRACT(DAY FROM NOW() - st.created_at)) <= $3
+            ) OR (
+              MAX(sp.completed_at) IS NOT NULL
+              AND $2 <= EXTRACT(DAY FROM NOW() - MAX(sp.completed_at))
+              AND EXTRACT(DAY FROM NOW() - MAX(sp.completed_at)) <= $3
+            )
+          ) sub`;
+        break;
+      }
+      case 'deadline_risk': {
+        const step = await req.db.queryOne('SELECT title FROM steps WHERE id = $1', [filterValue]);
+        title = `At-risk students for ${step?.title || 'this step'}`;
+        params = [filterValue, termId, perPage, offset];
+        countParams = [filterValue, termId];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2 AND sp.id IS NULL
+          ORDER BY st.display_name
+          LIMIT $3 OFFSET $4`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM students st
+          LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id AND sp.status IN ('completed', 'waived')
+          WHERE st.term_id = $2 AND sp.id IS NULL`;
+        break;
+      }
+      case 'velocity_bucket': {
+        title = `Students completing in ${filterValue}`;
+        const velRanges = {
+          '1-3 days': [0, 3],
+          '4-7 days': [4, 7],
+          '1-2 weeks': [8, 14],
+          '2-4 weeks': [15, 28],
+          '4+ weeks': [29, 99999],
+        };
+        const vRange = velRanges[filterValue];
+        if (!vRange) return res.status(400).json({ error: 'Invalid velocity_bucket value' });
+        const [minD, maxD] = vRange;
+        params = [termId, minD, maxD, perPage, offset];
+        countParams = [termId, minD, maxD];
+        studentQuery = `
+          SELECT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          JOIN (
+            SELECT sp.student_id,
+              EXTRACT(DAY FROM MAX(sp.completed_at) - MIN(sp.completed_at)) as days_elapsed
+            FROM student_progress sp
+            WHERE sp.status = 'completed'
+            GROUP BY sp.student_id
+          ) vel ON vel.student_id = st.id AND vel.days_elapsed >= $2 AND vel.days_elapsed <= $3
+          WHERE st.term_id = $1
+          ORDER BY st.display_name
+          LIMIT $4 OFFSET $5`;
+        countQuery = `
+          SELECT COUNT(*) as count FROM students st
+          JOIN (
+            SELECT sp.student_id,
+              EXTRACT(DAY FROM MAX(sp.completed_at) - MIN(sp.completed_at)) as days_elapsed
+            FROM student_progress sp
+            WHERE sp.status = 'completed'
+            GROUP BY sp.student_id
+          ) vel ON vel.student_id = st.id AND vel.days_elapsed >= $2 AND vel.days_elapsed <= $3
+          WHERE st.term_id = $1`;
+        break;
+      }
+      case 'trend_date': {
+        const dateStr = new Date(filterValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        title = `Completions on ${dateStr}`;
+        params = [filterValue, termId, perPage, offset];
+        countParams = [filterValue, termId];
+        studentQuery = `
+          SELECT DISTINCT st.id, st.display_name, st.email, st.emplid
+          FROM students st
+          JOIN student_progress sp ON sp.student_id = st.id AND DATE(sp.completed_at) = $1::date AND sp.status IN ('completed', 'waived')
+          JOIN steps s ON s.id = sp.step_id AND COALESCE(s.is_optional, 0) = 0
+          WHERE st.term_id = $2
+          ORDER BY st.display_name
+          LIMIT $3 OFFSET $4`;
+        countQuery = `
+          SELECT COUNT(DISTINCT st.id) as count
+          FROM students st
+          JOIN student_progress sp ON sp.student_id = st.id AND DATE(sp.completed_at) = $1::date AND sp.status IN ('completed', 'waived')
+          JOIN steps s ON s.id = sp.step_id AND COALESCE(s.is_optional, 0) = 0
+          WHERE st.term_id = $2`;
+        break;
+      }
+      default:
+        return res.status(400).json({ error: `Unknown filter_type: ${filterType}` });
+    }
+
+    const [students, totalResult] = await Promise.all([
+      req.db.queryAll(studentQuery, params),
+      req.db.queryOne(countQuery, countParams),
+    ]);
+    const total = parseInt(totalResult.count);
+
+    // Enrich with completion counts
+    const studentIds = students.map(s => s.id);
+    let completionMap = {};
+    if (studentIds.length > 0) {
+      const placeholders = studentIds.map((_, i) => `$${i + 1}`).join(',');
+      const completions = await req.db.queryAll(
+        `SELECT student_id, COUNT(*) as done
+         FROM student_progress
+         WHERE student_id IN (${placeholders}) AND status IN ('completed', 'waived')
+         GROUP BY student_id`,
+        studentIds
+      );
+      completionMap = Object.fromEntries(completions.map(c => [c.student_id, parseInt(c.done)]));
+    }
+
+    res.json({
+      title,
+      students: students.map(s => ({
+        ...s,
+        completed_count: completionMap[s.id] || 0,
+        total_steps: totalActiveSteps,
+        completion_pct: totalActiveSteps > 0 ? Math.round(((completionMap[s.id] || 0) / totalActiveSteps) * 100) : 0,
+      })),
+      total,
+      page,
+      per_page: perPage,
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/admin/analytics/cohort-comparison?term_id=
 router.get('/analytics/cohort-comparison', async (req, res, next) => {
   try {
