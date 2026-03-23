@@ -32,7 +32,9 @@
       "Bash(grep -n '\\\\${' \"/c/Users/andre/Desktop/CSUB admissions/server/routes/admin.js\")",
       "Bash(grep -E '\\\\$\\\\{\\(?!.*p\\\\.next|.*\\\\$\\\\d\\)')",
       "Bash(grep -v \"parseInt\\\\|JSON.stringify\\\\|JSON.parse\\\\|p.next\\(\\)\\\\|$\\\\d\")",
-      "Bash(grep -E '`.*req\\\\.\\(query|params|body\\).*\\\\$\\\\{' \"/c/Users/andre/Desktop/CSUB admissions/server/routes/admin.js\")"
+      "Bash(grep -E '`.*req\\\\.\\(query|params|body\\).*\\\\$\\\\{' \"/c/Users/andre/Desktop/CSUB admissions/server/routes/admin.js\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

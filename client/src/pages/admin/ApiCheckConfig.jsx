@@ -11,7 +11,7 @@ export default function ApiCheckConfig({ stepId, api }) {
   const [success, setSuccess] = useState(null);
 
   // Form state
-  const [enabled, setEnabled] = useState(true);
+  const [enabled, setEnabled] = useState(false);
   const [httpMethod, setHttpMethod] = useState('GET');
   const [url, setUrl] = useState('');
   const [authType, setAuthType] = useState('none');

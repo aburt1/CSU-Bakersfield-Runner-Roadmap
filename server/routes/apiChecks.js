@@ -98,7 +98,7 @@ router.put('/steps/:id/api-check', async (req, res) => {
          updated_at = NOW()`,
       [
         req.params.id,
-        is_enabled !== false,
+        is_enabled === true,
         method,
         url,
         aType,

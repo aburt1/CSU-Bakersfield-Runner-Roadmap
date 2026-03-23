@@ -159,7 +159,7 @@ export async function initDatabase() {
     CREATE TABLE IF NOT EXISTS step_api_checks (
       id SERIAL PRIMARY KEY,
       step_id INTEGER NOT NULL UNIQUE REFERENCES steps(id) ON DELETE CASCADE,
-      is_enabled BOOLEAN DEFAULT true,
+      is_enabled BOOLEAN DEFAULT false,
       http_method VARCHAR(10) DEFAULT 'GET',
       url TEXT NOT NULL,
       auth_type VARCHAR(20) DEFAULT 'none',
