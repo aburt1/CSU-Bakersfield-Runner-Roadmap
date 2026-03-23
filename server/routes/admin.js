@@ -719,7 +719,7 @@ router.get('/analytics/step-completion', async (req, res, next) => {
       `SELECT s.id, s.title, s.sort_order,
         COUNT(DISTINCT sp.student_id) as completed_count
        FROM steps s
-       LEFT JOIN student_progress sp ON sp.step_id = s.id
+       LEFT JOIN student_progress sp ON sp.step_id = s.id AND sp.status IN ('completed', 'waived')
        WHERE s.is_active = 1 AND COALESCE(s.is_optional, 0) = 0 ${termFilter}
        GROUP BY s.id, s.title, s.sort_order
        ORDER BY s.sort_order`,
@@ -745,7 +745,7 @@ router.get('/analytics/completion-trend', async (req, res, next) => {
       `SELECT DATE(sp.completed_at) as date, COUNT(*) as completions
        FROM student_progress sp
        ${termFilter}
-       WHERE sp.completed_at >= CURRENT_DATE - (${daysParam}::integer * INTERVAL '1 day')
+       WHERE sp.status IN ('completed', 'waived') AND sp.completed_at >= CURRENT_DATE - (${daysParam}::integer * INTERVAL '1 day')
        GROUP BY DATE(sp.completed_at)
        ORDER BY date`,
       params
@@ -772,7 +772,7 @@ router.get('/analytics/bottlenecks', async (req, res, next) => {
       `SELECT s.id, s.title, s.sort_order,
         COUNT(DISTINCT sp.student_id) as completed_count
        FROM steps s
-       LEFT JOIN student_progress sp ON sp.step_id = s.id
+       LEFT JOIN student_progress sp ON sp.step_id = s.id AND sp.status IN ('completed', 'waived')
        WHERE s.is_active = 1 AND COALESCE(s.is_optional, 0) = 0 ${termFilter}
        GROUP BY s.id, s.title, s.sort_order
        ORDER BY completed_count ASC
@@ -821,6 +821,7 @@ router.get('/analytics/cohort-summary', async (req, res, next) => {
          SELECT student_id, COUNT(*) as done
          FROM student_progress sp
          JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 ${stepFilter}
+         WHERE sp.status IN ('completed', 'waived')
          GROUP BY student_id
        ) pc ON pc.student_id = s.id
        ${studentFilter}
