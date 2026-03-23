@@ -75,9 +75,7 @@ async function startServer() {
     app.use('/api/integrations/v1', integrationsRouter);
     app.use('/api/roadmap', studentApiChecksRouter);
     app.use('/api/admin', apiChecksRouter);
-    if (process.env.NODE_ENV !== 'production') {
-      app.use('/api/mock', mockApiChecksRouter);
-    }
+    app.use('/api/mock', mockApiChecksRouter);
 
     // Health check
     app.get('/api/health', (req, res) => {
