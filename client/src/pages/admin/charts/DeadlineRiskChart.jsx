@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function DeadlineRiskChart({ termId, api }) {
+export default function DeadlineRiskChart({ termId, api, onDrillDown }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +45,7 @@ export default function DeadlineRiskChart({ termId, api }) {
             </thead>
             <tbody>
               {data.map(step => (
-                <tr key={step.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={step.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => onDrillDown?.({ filterType: 'deadline_risk', filterValue: step.id })}>
                   <td className="py-2 px-3 text-csub-blue-dark">{step.title}</td>
                   <td className="py-2 px-3 text-csub-gray">
                     {new Date(step.deadline_date).toLocaleDateString('en-US', {

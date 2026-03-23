@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function StalledStudentsChart({ termId, api }) {
+export default function StalledStudentsChart({ termId, api, onDrillDown }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +77,7 @@ export default function StalledStudentsChart({ termId, api }) {
             cursor={{ fill: 'rgba(0, 53, 148, 0.1)' }}
             formatter={(value) => [`${value} students`, 'Count']}
           />
-          <Bar dataKey="student_count" fill="#DC2626" radius={[8, 8, 0, 0]} />
+          <Bar dataKey="student_count" fill="#DC2626" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'stalled', filterValue: data.bucket })} />
         </BarChart>
       </ResponsiveContainer>
     </div>
