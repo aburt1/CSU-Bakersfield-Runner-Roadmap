@@ -6,8 +6,6 @@ export default function ProgressSummary({
   percentage,
   currentStepTitle,
   allComplete,
-  optionalCompletedCount = 0,
-  optionalTotalSteps = 0,
 }) {
   return (
     <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
@@ -55,11 +53,6 @@ export default function ProgressSummary({
           {allComplete && (
             <p className="font-body text-xs text-csub-blue font-semibold mt-1.5">
               All steps completed — you're all set!
-            </p>
-          )}
-          {optionalTotalSteps > 0 && (
-            <p className="font-body text-xs text-csub-gray mt-1">
-              Optional opportunities: <span className="font-semibold text-csub-blue-dark">{optionalCompletedCount}</span> of {optionalTotalSteps}
             </p>
           )}
         </div>
