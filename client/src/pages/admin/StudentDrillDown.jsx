@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentDrillDown({ open, onClose, filterType, filterValue, termId, api }) {
@@ -59,7 +60,7 @@ export default function StudentDrillDown({ open, onClose, filterType, filterValu
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -143,6 +144,7 @@ export default function StudentDrillDown({ open, onClose, filterType, filterValu
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
