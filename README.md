@@ -7,7 +7,6 @@ An interactive, road-themed student onboarding application for California State 
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
-![Three.js](https://img.shields.io/badge/Three.js-r160-000000?logo=three.js&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 
 ---
@@ -34,7 +33,6 @@ Admissions staff manage students, steps, analytics, audit logs, terms, and user 
 ## Features
 
 - **Interactive admissions roadmap** — Step-by-step checklist that tracks student progress from acceptance through enrollment
-- **3D road visualization** — Three.js-powered road scene with signposts, trees, and progress-based coloring
 - **Admin dashboard** — Manage students, steps, analytics, audit logs, academic terms, and admin users
 - **Integration API** — REST API for external systems (SIS, ERP, etc.) to sync step completions via stable keys with idempotent batch support
 - **Outbound API checks** — Poll external APIs to auto-verify step completion (configurable per step with encrypted credentials)
@@ -57,7 +55,7 @@ Admissions staff manage students, steps, analytics, audit logs, terms, and user 
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 18, Vite 6, Tailwind CSS 3, Three.js, Framer Motion, Recharts, Tiptap, DOMPurify |
+| **Frontend** | React 18, Vite 6, Tailwind CSS 3, Framer Motion, Recharts, Tiptap, DOMPurify |
 | **Backend** | Node.js, Express 4, PostgreSQL, JWT authentication |
 | **Auth** | Azure AD SSO integration, JWT sessions, bcrypt password hashing |
 | **Security** | Helmet, CORS, express-rate-limit, AES-256-GCM credential encryption |
@@ -173,7 +171,6 @@ That means "updating a student's step list" can mean any of the following:
 CSUB-admissions/
 ├── client/                     # React SPA (Vite)
 │   ├── src/
-│   │   ├── 3d/                 # Three.js road scene components
 │   │   ├── auth/               # Auth context + SSO config
 │   │   ├── components/         # Shared UI (Header, StepCard, roadmap/)
 │   │   ├── hooks/              # useProgress custom hook
