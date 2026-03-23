@@ -23,38 +23,26 @@ function stepApplies(step, studentTags) {
 }
 
 /**
- * Derive rich status for each step based on progress data from server.
- * progressMap: Map<stepId, { status: 'completed'|'waived', completed_at }>
- *
- * Statuses:
- * - completed: student finished it
- * - waived: admin waived it
- * - in_progress: the current active step (first step not completed/waived)
- * - not_started: upcoming steps after the current one
+ * Single-pass status derivation for all steps (required + optional merged).
+ * Required steps follow progression: first incomplete = in_progress, rest = not_started.
+ * Optional steps skip progression: completed/waived from progress, otherwise not_started.
  */
-function deriveStepStatuses(steps, progressMap) {
+function deriveAllStepStatuses(steps, progressMap) {
   let foundCurrent = false;
   return steps.map((step) => {
     const progress = progressMap.get(step.id);
 
-    if (progress) {
-      return { ...step, status: progress.status || 'completed' };
+    if (step.is_optional === 1) {
+      // Optional: no progression, just completed/waived/not_started
+      if (progress) return { ...step, status: progress.status || 'completed' };
+      return { ...step, status: 'not_started' };
     }
 
+    // Required: progression chain
+    if (progress) return { ...step, status: progress.status || 'completed' };
     if (!foundCurrent) {
       foundCurrent = true;
       return { ...step, status: 'in_progress' };
-    }
-
-    return { ...step, status: 'not_started' };
-  });
-}
-
-function deriveOptionalStepStatuses(steps, progressMap) {
-  return steps.map((step) => {
-    const progress = progressMap.get(step.id);
-    if (progress) {
-      return { ...step, status: progress.status || 'completed' };
     }
     return { ...step, status: 'not_started' };
   });
@@ -138,34 +126,21 @@ export function useProgress() {
     };
   }, [isAuthenticated, token]);
 
-  // Filter steps based on student tags and derive statuses
-  const { requiredSteps, optionalSteps, allSteps } = useMemo(() => {
+  // Filter steps based on student tags and derive statuses (single merged list)
+  const allSteps = useMemo(() => {
     const applicable = steps.filter((step) => stepApplies(step, studentTags));
-    const required = applicable.filter((step) => step.is_optional !== 1);
-    const optional = applicable.filter((step) => step.is_optional === 1);
-
-    const requiredWithStatuses = deriveStepStatuses(required, progressMap);
-    const optionalWithStatuses = deriveOptionalStepStatuses(optional, progressMap);
-
-    return {
-      requiredSteps: requiredWithStatuses,
-      optionalSteps: optionalWithStatuses,
-      allSteps: [...requiredWithStatuses, ...optionalWithStatuses],
-    };
+    return deriveAllStepStatuses(applicable, progressMap);
   }, [steps, studentTags, progressMap]);
 
-  const totalSteps = requiredSteps.length;
-  const doneCount = requiredSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
+  const requiredOnly = allSteps.filter((s) => s.is_optional !== 1);
+  const totalSteps = requiredOnly.length;
+  const doneCount = requiredOnly.filter((s) => s.status === 'completed' || s.status === 'waived').length;
   const percentage = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
-  const currentStep = requiredSteps.find((s) => s.status === 'in_progress') || null;
+  const currentStep = requiredOnly.find((s) => s.status === 'in_progress') || null;
   const allComplete = totalSteps > 0 && doneCount === totalSteps;
-  const optionalTotalSteps = optionalSteps.length;
-  const optionalCompletedCount = optionalSteps.filter((s) => s.status === 'completed' || s.status === 'waived').length;
 
   return {
     steps: allSteps,
-    requiredSteps,
-    optionalSteps,
     completedDates,
     studentTags,
     term,
@@ -176,8 +151,6 @@ export function useProgress() {
     percentage,
     currentStep,
     allComplete,
-    optionalTotalSteps,
-    optionalCompletedCount,
     retry: fetchProgress,
   };
 }
