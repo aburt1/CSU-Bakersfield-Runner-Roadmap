@@ -859,13 +859,24 @@ router.get('/analytics/deadline-risk', async (req, res, next) => {
 
     const result = [];
     for (const step of steps) {
-      const students = await req.db.queryAll(
-        `SELECT st.id, st.name, st.email
-         FROM students st
-         LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
-         WHERE st.term_id = $2 AND (sp.status IS NULL OR sp.status != 'completed')`,
-        [step.id, termId]
-      );
+      let students = [];
+      if (termId) {
+        students = await req.db.queryAll(
+          `SELECT st.id, st.name, st.email
+           FROM students st
+           LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
+           WHERE st.term_id = $2 AND (sp.status IS NULL OR sp.status != 'completed')`,
+          [step.id, termId]
+        );
+      } else {
+        students = await req.db.queryAll(
+          `SELECT st.id, st.name, st.email
+           FROM students st
+           LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
+           WHERE sp.status IS NULL OR sp.status != 'completed'`,
+          [step.id]
+        );
+      }
       result.push({
         ...step,
         total_students: parseInt(step.total_students),
@@ -884,9 +895,8 @@ router.get('/analytics/stalled-students', async (req, res, next) => {
     const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
     const days = parseInt(req.query.days, 10) || 7;
 
-    const { p, params } = termId ? { p: (n) => `$${n}`, params: [termId] } : { p: (n) => null, params: [] };
-    const termFilter = termId ? `WHERE st.term_id = ${p(1)}` : '';
-    const paramIndex = termId ? 2 : 1;
+    const termFilter = termId ? 'WHERE st.term_id = $1' : '';
+    const params = termId ? [termId] : [];
 
     const students = await req.db.queryAll(
       `SELECT st.id, st.name, st.email,
@@ -931,6 +941,9 @@ router.get('/analytics/cohort-comparison', async (req, res, next) => {
     const result = [];
 
     for (const tag of tags) {
+      const tagPattern = `%${tag}%`;
+      const params = termId ? [tagPattern, termId] : [tagPattern];
+
       const cohortResult = await req.db.queryOne(
         `SELECT COUNT(DISTINCT s.id) as student_count,
           ROUND(AVG(COALESCE(pc.done, 0)::float / ${totalSteps || 1}) * 100) as avg_completion_pct
@@ -938,14 +951,14 @@ router.get('/analytics/cohort-comparison', async (req, res, next) => {
          LEFT JOIN (
            SELECT student_id, COUNT(*) as done
            FROM student_progress sp
-           JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 ${termId ? 'AND st.term_id = $2' : ''}
+           JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0
            GROUP BY student_id
          ) pc ON pc.student_id = s.id
          WHERE (s.tags IS NULL OR s.tags LIKE $1) ${termId ? 'AND s.term_id = $2' : ''}`,
-        termId ? [`%${tag}%`, termId] : [`%${tag}%`]
+        params
       );
 
-      if (cohortResult.student_count > 0) {
+      if (cohortResult && cohortResult.student_count > 0) {
         result.push({
           tag,
           student_count: parseInt(cohortResult.student_count),
