@@ -296,6 +296,12 @@ export default function ApiCheckConfig({ stepId, api }) {
                 type="text"
                 value={testStudentId}
                 onChange={(e) => setTestStudentId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleTest();
+                  }
+                }}
                 className={field}
                 placeholder="Test student ID (e.g., 001001000)"
               />

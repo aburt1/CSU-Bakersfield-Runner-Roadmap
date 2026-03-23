@@ -27,7 +27,7 @@ function parseDetails(details) {
 }
 
 function formatTime(ts) {
-  const d = new Date(ts + 'Z');
+  const d = new Date(ts.endsWith('Z') ? ts : ts + 'Z');
   const now = new Date();
   const diffMs = now - d;
   const diffMins = Math.floor(diffMs / 60000);
