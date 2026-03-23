@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function CohortComparisonChart({ termId, api }) {
+export default function CohortComparisonChart({ termId, api, onDrillDown }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,7 +56,7 @@ export default function CohortComparisonChart({ termId, api }) {
             cursor={{ fill: 'rgba(0, 53, 148, 0.1)' }}
             formatter={(value) => [`${value}%`, 'Avg Completion']}
           />
-          <Bar dataKey="avg_completion_pct" fill="#003594" radius={[8, 8, 0, 0]} />
+          <Bar dataKey="avg_completion_pct" fill="#003594" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'tag', filterValue: data.tag })} />
         </BarChart>
       </ResponsiveContainer>
     </div>

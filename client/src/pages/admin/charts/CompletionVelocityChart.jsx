@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export default function CompletionVelocityChart({ termId, api }) {
+export default function CompletionVelocityChart({ termId, api, onDrillDown }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,7 +57,7 @@ export default function CompletionVelocityChart({ termId, api }) {
             cursor={{ fill: 'rgba(0, 53, 148, 0.1)' }}
             formatter={(value) => [`${value} students`, 'Count']}
           />
-          <Bar dataKey="student_count" radius={[8, 8, 0, 0]}>
+          <Bar dataKey="student_count" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'velocity_bucket', filterValue: data.bucket })}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
             ))}
