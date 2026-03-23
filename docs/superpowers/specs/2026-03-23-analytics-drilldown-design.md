@@ -34,13 +34,15 @@ In `server/routes/admin.js`, four analytics endpoints join or query `student_pro
 
 `GET /api/admin/analytics/students`
 
-A single flexible endpoint that returns a student list based on filter parameters. Capped at 200 rows to keep the panel performant — the response includes `total` so the UI can show "Showing 200 of 342 students" when capped.
+A single flexible endpoint that returns a paginated student list based on filter parameters.
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `term_id` | Yes | Filter to term |
 | `filter_type` | Yes | One of the filter types below |
 | `filter_value` | Depends | Value for the filter (e.g. step ID, tag name) |
+| `page` | No | Page number, defaults to 1 |
+| `per_page` | No | Results per page, defaults to 50, max 100 |
 
 **Filter types:**
 
@@ -86,19 +88,22 @@ Velocity buckets:
       "completion_pct": 31
     }
   ],
-  "total": 42
+  "total": 42,
+  "page": 1,
+  "per_page": 50
 }
 ```
 
-The endpoint generates a human-readable `title` based on the filter type and value. `total` reflects the true count even when results are capped at 200.
+The endpoint generates a human-readable `title` based on the filter type and value. `total` is always the full count regardless of pagination. `page` and `per_page` reflect the current page.
 
 ### New Client Component: StudentDrillDown
 
 A slide-out panel (right side, similar to existing step detail panels) showing:
 
 - **Header**: Title describing the population (e.g. "Students who haven't completed Register for Classes")
-- **Count badge**: "42 students" (or "Showing 200 of 342 students" when capped)
+- **Count badge**: "42 students"
 - **Scrollable student list**: Each row shows name, email, and completion % bar
+- **"Load more" button**: Appears at the bottom when more pages exist. Appends next batch of 50 to the existing list.
 - **Close button** (X) and click-outside-to-close
 - **Empty state**: "No students match this filter"
 
@@ -183,4 +188,5 @@ const chartData = data.map((d) => ({
 12. Click a bar on completion velocity — should show students in that velocity range
 13. Close the panel (X button or click outside) — should return to charts view
 14. Panel should show "No students match this filter" when the list is empty
-15. Panel should show "Showing 200 of N students" when results exceed 200
+15. "Load more" button should appear when there are more than 50 students, and append the next page when clicked
+16. "Load more" button should disappear once all students are loaded
