@@ -981,13 +981,13 @@ router.get('/analytics/students', async (req, res, next) => {
           SELECT st.id, st.display_name, st.email, st.emplid
           FROM students st
           LEFT JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
-          WHERE st.term_id = $2 AND sp.id IS NULL
+          WHERE st.term_id = $2 AND sp.student_id IS NULL
           ORDER BY st.display_name
           LIMIT $3 OFFSET $4`;
         countQuery = `
           SELECT COUNT(*) as count FROM students st
           LEFT JOIN student_progress sp ON sp.student_id = st.id AND sp.step_id = $1 AND sp.status IN ('completed', 'waived')
-          WHERE st.term_id = $2 AND sp.id IS NULL`;
+          WHERE st.term_id = $2 AND sp.student_id IS NULL`;
         break;
       }
       case 'cohort_bucket': {
@@ -1104,13 +1104,13 @@ router.get('/analytics/students', async (req, res, next) => {
           SELECT st.id, st.display_name, st.email, st.emplid
           FROM students st
           LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id AND sp.status IN ('completed', 'waived')
-          WHERE st.term_id = $2 AND sp.id IS NULL
+          WHERE st.term_id = $2 AND sp.student_id IS NULL
           ORDER BY st.display_name
           LIMIT $3 OFFSET $4`;
         countQuery = `
           SELECT COUNT(*) as count FROM students st
           LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id AND sp.status IN ('completed', 'waived')
-          WHERE st.term_id = $2 AND sp.id IS NULL`;
+          WHERE st.term_id = $2 AND sp.student_id IS NULL`;
         break;
       }
       case 'velocity_bucket': {
