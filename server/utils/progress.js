@@ -67,9 +67,10 @@ export async function resolveStepForStudentByKey(db, student, stepKey) {
   return { step, stepKey: normalizedStepKey };
 }
 
-export async function applyStudentProgressChange(db, { studentId, stepId, status, note, completedAt } = {}) {
+export async function applyStudentProgressChange(db, { studentId, stepId, status, note, completedAt, completedBy } = {}) {
   const nextStatus = status === 'waived' ? 'waived' : status === 'not_completed' ? 'not_completed' : 'completed';
   const normalizedNote = note == null || note === '' ? null : String(note);
+  const normalizedCompletedBy = completedBy || 'manual';
   const explicitCompletedAt = completedAt === undefined ? undefined : normalizeCompletedAt(completedAt);
 
   if (completedAt !== undefined && !explicitCompletedAt) {
@@ -77,7 +78,7 @@ export async function applyStudentProgressChange(db, { studentId, stepId, status
   }
 
   const current = await db.queryOne(
-    `SELECT student_id, step_id, completed_at, status, note
+    `SELECT student_id, step_id, completed_at, status, note, completed_by
      FROM student_progress
      WHERE student_id = $1 AND step_id = $2`,
     [studentId, stepId]
@@ -85,7 +86,7 @@ export async function applyStudentProgressChange(db, { studentId, stepId, status
 
   if (nextStatus === 'not_completed') {
     if (!current) {
-      return { result: 'noop', status: 'not_completed', completedAt: null };
+      return { result: 'noop', status: 'not_completed', completedAt: null, completedBy: normalizedCompletedBy };
     }
 
     await db.execute(
@@ -93,7 +94,7 @@ export async function applyStudentProgressChange(db, { studentId, stepId, status
       [studentId, stepId]
     );
 
-    return { result: 'updated', status: 'not_completed', completedAt: null };
+    return { result: 'updated', status: 'not_completed', completedAt: null, completedBy: normalizedCompletedBy };
   }
 
   if (current) {
@@ -106,27 +107,28 @@ export async function applyStudentProgressChange(db, { studentId, stepId, status
     if (
       current.status === nextStatus &&
       (current.note ?? null) === normalizedNote &&
-      isSameCompletedAt
+      isSameCompletedAt &&
+      (current.completed_by || 'manual') === normalizedCompletedBy
     ) {
-      return { result: 'noop', status: nextStatus, completedAt: currentCompletedAt };
+      return { result: 'noop', status: nextStatus, completedAt: currentCompletedAt, completedBy: current.completed_by || 'manual' };
     }
 
     await db.execute(
       `UPDATE student_progress
-       SET status = $1, note = $2, completed_at = $3
-       WHERE student_id = $4 AND step_id = $5`,
-      [nextStatus, normalizedNote, nextCompletedAt, studentId, stepId]
+       SET status = $1, note = $2, completed_at = $3, completed_by = $4
+       WHERE student_id = $5 AND step_id = $6`,
+      [nextStatus, normalizedNote, nextCompletedAt, normalizedCompletedBy, studentId, stepId]
     );
 
-    return { result: 'updated', status: nextStatus, completedAt: nextCompletedAt };
+    return { result: 'updated', status: nextStatus, completedAt: nextCompletedAt, completedBy: normalizedCompletedBy };
   }
 
   const nextCompletedAt = explicitCompletedAt ?? new Date().toISOString();
   await db.execute(
-    `INSERT INTO student_progress (student_id, step_id, completed_at, status, note)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [studentId, stepId, nextCompletedAt, nextStatus, normalizedNote]
+    `INSERT INTO student_progress (student_id, step_id, completed_at, status, note, completed_by)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [studentId, stepId, nextCompletedAt, nextStatus, normalizedNote, normalizedCompletedBy]
   );
 
-  return { result: 'created', status: nextStatus, completedAt: nextCompletedAt };
+  return { result: 'created', status: nextStatus, completedAt: nextCompletedAt, completedBy: normalizedCompletedBy };
 }

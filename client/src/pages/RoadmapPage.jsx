@@ -39,6 +39,47 @@ export default function RoadmapPage() {
   const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [updatingOptionalStepId, setUpdatingOptionalStepId] = useState(null);
 
+  // API check polling — trigger background checks and poll for results
+  useEffect(() => {
+    if (loading || !token || steps.length === 0) return;
+
+    let intervalId = null;
+    let stopped = false;
+
+    fetch('/api/roadmap/run-api-checks', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (stopped || data.status !== 'started') return;
+
+        const startTime = Date.now();
+        intervalId = setInterval(async () => {
+          if (Date.now() - startTime > 30000) {
+            clearInterval(intervalId);
+            return;
+          }
+          try {
+            const res = await fetch('/api/roadmap/check-status', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const poll = await res.json();
+            if (poll.checkedSteps?.length > 0) retry();
+            if (poll.status === 'complete') clearInterval(intervalId);
+          } catch {
+            clearInterval(intervalId);
+          }
+        }, 2000);
+      })
+      .catch(() => {});
+
+    return () => {
+      stopped = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [loading, token, steps.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Show celebration once when all complete
   useEffect(() => {
     if (allComplete && !celebrationShown) {

@@ -24,7 +24,11 @@
       "Bash(npx vite:*)",
       "Bash(grep -E \"\\\\.jsx$\")",
       "Bash(ls -la /Users/aburt1/Desktop/roadmap/CSUB-admissions/server/*.js)",
-      "WebFetch(domain:kuali.zendesk.com)"
+      "WebFetch(domain:kuali.zendesk.com)",
+      "Bash(curl -s http://localhost:3001/api/mock)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s http://localhost:3001/api/mock/fafsa/001000001)",
+      "Bash(curl -s http://localhost:3001/api/mock/fafsa/001000002)"
     ]
   }
 }

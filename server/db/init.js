@@ -79,6 +79,8 @@ export async function initDatabase() {
     'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_public INTEGER DEFAULT 0',
     'ALTER TABLE steps ADD COLUMN IF NOT EXISTS step_key TEXT',
     'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_optional INTEGER DEFAULT 0',
+    'ALTER TABLE students ADD COLUMN IF NOT EXISTS last_api_check_at TIMESTAMPTZ',
+    "ALTER TABLE student_progress ADD COLUMN IF NOT EXISTS completed_by VARCHAR(20) DEFAULT 'manual'",
   ];
   for (const sql of migrations) {
     await db.execute(sql);
@@ -149,6 +151,25 @@ export async function initDatabase() {
       response_body TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       FOREIGN KEY (integration_client_id) REFERENCES integration_clients(id)
+    )
+  `);
+
+  // API check configuration per step (1:1 relationship)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS step_api_checks (
+      id SERIAL PRIMARY KEY,
+      step_id INTEGER NOT NULL UNIQUE REFERENCES steps(id) ON DELETE CASCADE,
+      is_enabled BOOLEAN DEFAULT true,
+      http_method VARCHAR(10) DEFAULT 'GET',
+      url TEXT NOT NULL,
+      auth_type VARCHAR(20) DEFAULT 'none',
+      auth_credentials TEXT,
+      headers TEXT,
+      student_param_name VARCHAR(100) DEFAULT 'studentId',
+      student_param_source VARCHAR(50) DEFAULT 'emplid',
+      response_field_path VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
 

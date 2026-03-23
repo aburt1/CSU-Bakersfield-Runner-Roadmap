@@ -21,6 +21,7 @@ function GripIcon() {
 function DraggableStepRow({
   step, index, totalVisible, canEdit, selected, editingStepId,
   onToggleSelect, onMoveStep, onEdit, onDuplicate, onDelete, onRestore, onSave, onCancelEdit, selectedTermId,
+  role, api,
 }) {
   const dragControls = useDragControls();
   const isEditing = editingStepId === step.id;
@@ -153,6 +154,8 @@ function DraggableStepRow({
             selectedTermId={selectedTermId}
             onSave={onSave}
             onCancel={onCancelEdit}
+            role={role}
+            api={api}
           />
         </div>
       )}
@@ -386,6 +389,8 @@ export default function TermStepsTab({ api, role = 'viewer', terms, selectedTerm
     onSave: handleSaveStep,
     onCancelEdit: () => setEditingStep(null),
     selectedTermId,
+    role,
+    api,
   });
 
   return (
@@ -461,6 +466,8 @@ export default function TermStepsTab({ api, role = 'viewer', terms, selectedTerm
               selectedTermId={selectedTermId}
               onSave={handleSaveStep}
               onCancel={() => setEditingStep(null)}
+              role={role}
+              api={api}
             />
           </div>
         )}

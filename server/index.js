@@ -11,6 +11,9 @@ import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import adminAuthRouter from './routes/adminAuth.js';
 import integrationsRouter from './routes/integrations.js';
+import studentApiChecksRouter from './routes/studentApiChecks.js';
+import apiChecksRouter from './routes/apiChecks.js';
+import mockApiChecksRouter from './routes/mockApiChecks.js';
 
 dotenv.config();
 
@@ -70,6 +73,11 @@ async function startServer() {
     app.use('/api/admin/auth', adminAuthRouter);
     app.use('/api/admin', adminRouter);
     app.use('/api/integrations/v1', integrationsRouter);
+    app.use('/api/roadmap', studentApiChecksRouter);
+    app.use('/api/admin', apiChecksRouter);
+    if (process.env.NODE_ENV !== 'production') {
+      app.use('/api/mock', mockApiChecksRouter);
+    }
 
     // Health check
     app.get('/api/health', (req, res) => {

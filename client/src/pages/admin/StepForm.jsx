@@ -3,6 +3,7 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import TagEditor from './TagEditor';
 import RichTextEditor from './RichTextEditor';
+import ApiCheckConfig from './ApiCheckConfig';
 
 const TAG_PRESETS = [
   'freshman',
@@ -65,7 +66,7 @@ function Section({ title, description, children }) {
   );
 }
 
-export default function StepForm({ step, onSave, onCancel, selectedTermId }) {
+export default function StepForm({ step, onSave, onCancel, selectedTermId, role, api }) {
   const iconPickerRef = useRef(null);
   const [title, setTitle] = useState(step?.title || '');
   const [icon, setIcon] = useState(step?.icon || '📋');
@@ -442,6 +443,10 @@ export default function StepForm({ step, onSave, onCancel, selectedTermId }) {
           />
         </div>
       </Section>
+
+      {role === 'sysadmin' && step?.id && api && (
+        <ApiCheckConfig stepId={step.id} api={api} />
+      )}
 
       <div className="flex gap-3 pt-2">
         <button

@@ -151,6 +151,7 @@ async function processCompletionItem(req, item) {
     status: item.status,
     note: item.note,
     completedAt: item.completed_at,
+    completedBy: 'integration',
   });
 
   if (progressChange.error) {
