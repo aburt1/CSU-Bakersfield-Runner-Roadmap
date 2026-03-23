@@ -16,8 +16,6 @@ export default function RoadmapPage() {
   const { user, token, logout } = useAuth();
   const {
     steps,
-    requiredSteps,
-    optionalSteps,
     completedDates,
     loading,
     error,
@@ -26,8 +24,6 @@ export default function RoadmapPage() {
     percentage,
     currentStep,
     allComplete,
-    optionalTotalSteps,
-    optionalCompletedCount,
     term,
     retry,
   } = useProgress();
@@ -92,20 +88,15 @@ export default function RoadmapPage() {
   const firstName = user?.displayName?.split(' ')[0] || 'Student';
 
   // Filter steps
-  const filteredRequiredSteps = useMemo(() => {
-    if (!showOnlyIncomplete) return requiredSteps;
-    return requiredSteps.filter((s) => s.status !== 'completed' && s.status !== 'waived');
-  }, [requiredSteps, showOnlyIncomplete]);
-
-  const filteredOptionalSteps = useMemo(() => {
-    if (!showOnlyIncomplete) return optionalSteps;
-    return optionalSteps.filter((s) => s.status !== 'completed' && s.status !== 'waived');
-  }, [optionalSteps, showOnlyIncomplete]);
+  const filteredSteps = useMemo(() => {
+    if (!showOnlyIncomplete) return steps;
+    return steps.filter((s) => s.status !== 'completed' && s.status !== 'waived');
+  }, [steps, showOnlyIncomplete]);
 
   const selectedStepList = useMemo(() => {
     if (!selectedStep) return [];
-    return selectedStep.is_optional === 1 ? filteredOptionalSteps : filteredRequiredSteps;
-  }, [selectedStep, filteredOptionalSteps, filteredRequiredSteps]);
+    return filteredSteps;
+  }, [selectedStep, filteredSteps]);
 
   const handleOptionalStepStatusChange = async (step, status) => {
     setUpdatingOptionalStepId(step.id);
@@ -247,8 +238,6 @@ export default function RoadmapPage() {
         percentage={percentage}
         currentStepTitle={currentStep?.title}
         allComplete={allComplete}
-        optionalCompletedCount={optionalCompletedCount}
-        optionalTotalSteps={optionalTotalSteps}
       />
 
       <main id="main-content" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
@@ -321,56 +310,20 @@ export default function RoadmapPage() {
         {/* ===== D. Roadmap View ===== */}
         {viewMode === 'timeline' ? (
           <RoadmapTimeline
-            steps={filteredRequiredSteps}
+            steps={filteredSteps}
             completedDates={completedDates}
             onSelectStep={setSelectedStep}
           />
         ) : (
           <ListView
-            steps={filteredRequiredSteps}
+            steps={filteredSteps}
             completedDates={completedDates}
             onSelectStep={setSelectedStep}
           />
         )}
 
-        {optionalTotalSteps > 0 && (
-          <section className="mt-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wider">
-                  Optional Opportunities
-                </h2>
-                <div className="flex-1 h-px bg-gray-200 hidden sm:block" style={{ minWidth: '2rem' }} />
-              </div>
-              <span className="font-body text-xs text-csub-gray">
-                {optionalCompletedCount} of {optionalTotalSteps} completed
-              </span>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4">
-              <p className="font-body text-sm text-csub-gray">
-                These steps are optional, but you can mark them complete here to keep track of your progress.
-              </p>
-            </div>
-
-            {viewMode === 'timeline' ? (
-              <RoadmapTimeline
-                steps={filteredOptionalSteps}
-                completedDates={completedDates}
-                onSelectStep={setSelectedStep}
-              />
-            ) : (
-              <ListView
-                steps={filteredOptionalSteps}
-                completedDates={completedDates}
-                onSelectStep={setSelectedStep}
-              />
-            )}
-          </section>
-        )}
-
         {/* Filtered empty state */}
-        {showOnlyIncomplete && filteredRequiredSteps.length === 0 && filteredOptionalSteps.length === 0 && (
+        {showOnlyIncomplete && filteredSteps.length === 0 && (
           <div className="text-center py-12">
             <div className="text-4xl mb-3">🎉</div>
             <p className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
