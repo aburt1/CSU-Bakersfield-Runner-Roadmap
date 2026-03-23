@@ -1,9 +1,10 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export default function BottleneckChart({ data }) {
+export default function BottleneckChart({ data, onDrillDown }) {
   if (!data?.steps?.length) return <p className="font-body text-sm text-csub-gray text-center py-4">No data</p>;
 
   const chartData = data.steps.map((s) => ({
+    id: s.id,
     name: s.title.length > 25 ? s.title.slice(0, 23) + '...' : s.title,
     fullTitle: s.title,
     pct: s.completion_pct,
@@ -28,7 +29,7 @@ export default function BottleneckChart({ data }) {
             formatter={(value, name, props) => [`${props.payload.count}/${props.payload.total} (${value}%)`, 'Completion']}
             labelFormatter={(label) => chartData.find(d => d.name === label)?.fullTitle || label}
           />
-          <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="pct" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'step_not_completed', filterValue: data.id })}>
             {chartData.map((entry, i) => (
               <Cell key={i} fill={getColor(entry.pct)} />
             ))}
