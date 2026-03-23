@@ -9,6 +9,7 @@ import StalledStudentsChart from './charts/StalledStudentsChart';
 import CohortComparisonChart from './charts/CohortComparisonChart';
 import CompletionVelocityChart from './charts/CompletionVelocityChart';
 import ExportButton from './ExportButton';
+import StudentDrillDown from './StudentDrillDown';
 
 export default function AnalyticsTab({ api, termId }) {
   const [stepCompletion, setStepCompletion] = useState(null);
@@ -17,6 +18,7 @@ export default function AnalyticsTab({ api, termId }) {
   const [cohort, setCohort] = useState(null);
   const [trendDays, setTrendDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  const [drillDown, setDrillDown] = useState(null);
 
   useEffect(() => {
     if (!termId) return;
@@ -64,7 +66,7 @@ export default function AnalyticsTab({ api, termId }) {
           Step Completion Rates
         </h3>
         <p className="font-body text-xs text-csub-gray mb-4">Percentage of students who have completed each step</p>
-        <StepCompletionChart data={stepCompletion} />
+        <StepCompletionChart data={stepCompletion} onDrillDown={setDrillDown} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -93,7 +95,7 @@ export default function AnalyticsTab({ api, termId }) {
               ))}
             </div>
           </div>
-          <CompletionTrendChart data={trend} />
+          <CompletionTrendChart data={trend} onDrillDown={setDrillDown} />
         </div>
 
         {/* Bottlenecks */}
@@ -102,7 +104,7 @@ export default function AnalyticsTab({ api, termId }) {
             Bottleneck Steps
           </h3>
           <p className="font-body text-xs text-csub-gray mb-3">Steps with the lowest completion rates</p>
-          <BottleneckChart data={bottlenecks} />
+          <BottleneckChart data={bottlenecks} onDrillDown={setDrillDown} />
         </div>
       </div>
 
@@ -112,7 +114,7 @@ export default function AnalyticsTab({ api, termId }) {
           Student Progress Distribution
         </h3>
         <p className="font-body text-xs text-csub-gray mb-4">How students are distributed across completion percentages</p>
-        <CohortDistributionChart data={cohort} />
+        <CohortDistributionChart data={cohort} onDrillDown={setDrillDown} />
       </div>
 
       {/* Admissions Outreach Analytics */}
@@ -123,20 +125,28 @@ export default function AnalyticsTab({ api, termId }) {
 
         {/* Deadline Risk */}
         <div className="mb-6">
-          <DeadlineRiskChart termId={termId} api={api} />
+          <DeadlineRiskChart termId={termId} api={api} onDrillDown={setDrillDown} />
         </div>
 
         {/* Stalled Students */}
         <div className="mb-6">
-          <StalledStudentsChart termId={termId} api={api} />
+          <StalledStudentsChart termId={termId} api={api} onDrillDown={setDrillDown} />
         </div>
 
         {/* Cohort Comparison + Velocity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CohortComparisonChart termId={termId} api={api} />
-          <CompletionVelocityChart termId={termId} api={api} />
+          <CohortComparisonChart termId={termId} api={api} onDrillDown={setDrillDown} />
+          <CompletionVelocityChart termId={termId} api={api} onDrillDown={setDrillDown} />
         </div>
       </div>
+
+      <StudentDrillDown
+        open={!!drillDown}
+        onClose={() => setDrillDown(null)}
+        {...drillDown}
+        termId={termId}
+        api={api}
+      />
     </div>
   );
 }
