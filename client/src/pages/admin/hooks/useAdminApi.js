@@ -22,7 +22,15 @@ export function useAdminApi(token) {
     return res.json();
   }, [token]);
 
-  const get = useCallback((path) => request(path), [request]);
+  const get = useCallback((path, params) => {
+    if (params) {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v != null)
+      ).toString();
+      if (qs) return request(`${path}?${qs}`);
+    }
+    return request(path);
+  }, [request]);
   const post = useCallback((path, body) => request(path, { method: 'POST', body }), [request]);
   const put = useCallback((path, body) => request(path, { method: 'PUT', body }), [request]);
   const del = useCallback((path, body) => request(path, { method: 'DELETE', body }), [request]);
