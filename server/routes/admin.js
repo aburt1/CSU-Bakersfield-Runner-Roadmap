@@ -833,6 +833,167 @@ router.get('/analytics/cohort-summary', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/admin/analytics/deadline-risk?term_id=&days=14
+router.get('/analytics/deadline-risk', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+    const days = parseInt(req.query.days, 10) || 14;
+
+    const termFilter = termId ? 'AND s.term_id = $1' : '';
+    const params = termId ? [termId] : [];
+
+    const steps = await req.db.queryAll(
+      `SELECT s.id, s.title, s.deadline_date,
+        COUNT(DISTINCT st.id) as total_students,
+        COUNT(DISTINCT CASE WHEN sp.status != 'completed' THEN st.id END) as at_risk_count
+       FROM steps s
+       JOIN students st ON st.term_id = s.term_id
+       LEFT JOIN student_progress sp ON sp.step_id = s.id AND sp.student_id = st.id
+       WHERE s.is_active = 1 AND s.deadline_date IS NOT NULL
+         AND s.deadline_date <= NOW() + INTERVAL '${days} days'
+         AND s.deadline_date > NOW() ${termFilter}
+       GROUP BY s.id, s.title, s.deadline_date
+       ORDER BY s.deadline_date ASC`,
+      params
+    );
+
+    const result = [];
+    for (const step of steps) {
+      const students = await req.db.queryAll(
+        `SELECT st.id, st.name, st.email
+         FROM students st
+         LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
+         WHERE st.term_id = $2 AND (sp.status IS NULL OR sp.status != 'completed')`,
+        [step.id, termId]
+      );
+      result.push({
+        ...step,
+        total_students: parseInt(step.total_students),
+        at_risk_count: parseInt(step.at_risk_count),
+        students,
+      });
+    }
+
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/analytics/stalled-students?term_id=&days=7
+router.get('/analytics/stalled-students', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+    const days = parseInt(req.query.days, 10) || 7;
+
+    const { p, params } = termId ? { p: (n) => `$${n}`, params: [termId] } : { p: (n) => null, params: [] };
+    const termFilter = termId ? `WHERE st.term_id = ${p(1)}` : '';
+    const paramIndex = termId ? 2 : 1;
+
+    const students = await req.db.queryAll(
+      `SELECT st.id, st.name, st.email,
+        MAX(sp.updated_at) as last_completion_date,
+        COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) as completed_count
+       FROM students st
+       LEFT JOIN student_progress sp ON sp.student_id = st.id
+       ${termFilter}
+       GROUP BY st.id, st.name, st.email
+       HAVING COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) = 0
+         OR MAX(sp.updated_at) < NOW() - INTERVAL '${days} days'
+       ORDER BY COALESCE(MAX(sp.updated_at), st.created_at) ASC`,
+      params
+    );
+
+    const totalStepsResult = await req.db.queryOne(
+      termId ? 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = $1' : 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0',
+      termId ? [termId] : []
+    );
+    const totalSteps = parseInt(totalStepsResult.count);
+
+    res.json(students.map(s => ({
+      ...s,
+      completed_count: parseInt(s.completed_count),
+      total_steps: totalSteps,
+    })));
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/analytics/cohort-comparison?term_id=
+router.get('/analytics/cohort-comparison', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+
+    const totalStepsResult = await req.db.queryOne(
+      termId ? 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0 AND term_id = $1' : 'SELECT COUNT(*) as count FROM steps WHERE is_active = 1 AND COALESCE(is_optional, 0) = 0',
+      termId ? [termId] : []
+    );
+    const totalSteps = parseInt(totalStepsResult.count);
+
+    const tags = ['freshman', 'transfer', 'first-gen', 'honors', 'athlete', 'eop', 'veteran', 'out-of-state'];
+    const result = [];
+
+    for (const tag of tags) {
+      const cohortResult = await req.db.queryOne(
+        `SELECT COUNT(DISTINCT s.id) as student_count,
+          ROUND(AVG(COALESCE(pc.done, 0)::float / ${totalSteps || 1}) * 100) as avg_completion_pct
+         FROM students s
+         LEFT JOIN (
+           SELECT student_id, COUNT(*) as done
+           FROM student_progress sp
+           JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0 ${termId ? 'AND st.term_id = $2' : ''}
+           GROUP BY student_id
+         ) pc ON pc.student_id = s.id
+         WHERE (s.tags IS NULL OR s.tags LIKE $1) ${termId ? 'AND s.term_id = $2' : ''}`,
+        termId ? [`%${tag}%`, termId] : [`%${tag}%`]
+      );
+
+      if (cohortResult.student_count > 0) {
+        result.push({
+          tag,
+          student_count: parseInt(cohortResult.student_count),
+          avg_completion_pct: parseInt(cohortResult.avg_completion_pct),
+        });
+      }
+    }
+
+    res.json(result.sort((a, b) => b.student_count - a.student_count));
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/analytics/completion-velocity?term_id=
+router.get('/analytics/completion-velocity', async (req, res, next) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
+
+    const students = await req.db.queryAll(
+      `SELECT st.id,
+        EXTRACT(DAY FROM MAX(sp.updated_at) - MIN(sp.updated_at)) as days_elapsed
+       FROM students st
+       JOIN student_progress sp ON sp.student_id = st.id AND sp.status = 'completed'
+       ${termId ? 'WHERE st.term_id = $1' : ''}
+       GROUP BY st.id`,
+      termId ? [termId] : []
+    );
+
+    const buckets = {
+      '1-3 days': 0,
+      '4-7 days': 0,
+      '1-2 weeks': 0,
+      '2-4 weeks': 0,
+      '4+ weeks': 0,
+    };
+
+    for (const student of students) {
+      const days = parseInt(student.days_elapsed) || 0;
+      if (days <= 3) buckets['1-3 days']++;
+      else if (days <= 7) buckets['4-7 days']++;
+      else if (days <= 14) buckets['1-2 weeks']++;
+      else if (days <= 28) buckets['2-4 weeks']++;
+      else buckets['4+ weeks']++;
+    }
+
+    res.json(Object.entries(buckets).map(([bucket, count]) => ({ bucket, student_count: count })));
+  } catch (err) { next(err); }
+});
+
 // ─── Terms ───────────────────────────────────────────────
 
 // GET /api/admin/terms

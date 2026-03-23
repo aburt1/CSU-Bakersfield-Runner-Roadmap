@@ -4,6 +4,10 @@ import StepCompletionChart from './charts/StepCompletionChart';
 import CompletionTrendChart from './charts/CompletionTrendChart';
 import BottleneckChart from './charts/BottleneckChart';
 import CohortDistributionChart from './charts/CohortDistributionChart';
+import DeadlineRiskChart from './charts/DeadlineRiskChart';
+import StalledStudentsChart from './charts/StalledStudentsChart';
+import CohortComparisonChart from './charts/CohortComparisonChart';
+import CompletionVelocityChart from './charts/CompletionVelocityChart';
 import ExportButton from './ExportButton';
 
 export default function AnalyticsTab({ api, termId }) {
@@ -56,9 +60,10 @@ export default function AnalyticsTab({ api, termId }) {
 
       {/* Step Completion Rates */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-4">
+        <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-1">
           Step Completion Rates
         </h3>
+        <p className="font-body text-xs text-csub-gray mb-4">Percentage of students who have completed each step</p>
         <StepCompletionChart data={stepCompletion} />
       </div>
 
@@ -66,9 +71,12 @@ export default function AnalyticsTab({ api, termId }) {
         {/* Completion Trend */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
-              Completion Trend
-            </h3>
+            <div>
+              <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide">
+                Completion Trend
+              </h3>
+              <p className="font-body text-xs text-csub-gray mt-1">How many students are completing steps over time</p>
+            </div>
             <div className="flex gap-1">
               {[7, 30, 90].map((d) => (
                 <button
@@ -100,10 +108,34 @@ export default function AnalyticsTab({ api, termId }) {
 
       {/* Cohort Distribution */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-4">
+        <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-1">
           Student Progress Distribution
         </h3>
+        <p className="font-body text-xs text-csub-gray mb-4">How students are distributed across completion percentages</p>
         <CohortDistributionChart data={cohort} />
+      </div>
+
+      {/* Admissions Outreach Analytics */}
+      <div className="border-t border-gray-300 pt-8">
+        <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide mb-6">
+          Outreach & Action Items
+        </h2>
+
+        {/* Deadline Risk */}
+        <div className="mb-6">
+          <DeadlineRiskChart termId={termId} api={api} />
+        </div>
+
+        {/* Stalled Students */}
+        <div className="mb-6">
+          <StalledStudentsChart termId={termId} api={api} />
+        </div>
+
+        {/* Cohort Comparison + Velocity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <CohortComparisonChart termId={termId} api={api} />
+          <CompletionVelocityChart termId={termId} api={api} />
+        </div>
       </div>
     </div>
   );
