@@ -1,10 +1,11 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function CompletionTrendChart({ data }) {
+export default function CompletionTrendChart({ data, onDrillDown }) {
   if (!data?.length) return <p className="font-body text-sm text-csub-gray text-center py-4">No data</p>;
 
   const chartData = data.map((d) => ({
     date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    rawDate: d.date,
     completions: d.completions,
   }));
 
@@ -21,8 +22,8 @@ export default function CompletionTrendChart({ data }) {
             dataKey="completions"
             stroke="#003594"
             strokeWidth={2}
-            dot={{ fill: '#FFC72C', r: 4 }}
-            activeDot={{ r: 6, fill: '#FFC72C' }}
+            dot={{ fill: '#FFC72C', r: 4, cursor: 'pointer' }}
+            activeDot={{ r: 6, fill: '#FFC72C', cursor: 'pointer', onClick: (e, payload) => onDrillDown?.({ filterType: 'trend_date', filterValue: payload.payload.rawDate }) }}
           />
         </LineChart>
       </ResponsiveContainer>

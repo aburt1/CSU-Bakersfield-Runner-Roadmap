@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#DC2626', '#F59E0B', '#3B82F6', '#003594', '#FFC72C'];
 const BUCKET_ORDER = ['0%', '1-25%', '26-50%', '51-75%', '76-100%'];
 
-export default function CohortDistributionChart({ data }) {
+export default function CohortDistributionChart({ data, onDrillDown }) {
   if (!data?.length) return <p className="font-body text-sm text-csub-gray text-center py-4">No data</p>;
 
   // Ensure all buckets exist and are in order
@@ -34,7 +34,7 @@ export default function CohortDistributionChart({ data }) {
             formatter={(value) => [`${value} students`, 'Count']}
             labelFormatter={(label) => `Progress: ${label}`}
           />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'cohort_bucket', filterValue: data.name })}>
             {chartData.map((entry, i) => (
               <Cell key={i} fill={entry.color} />
             ))}
