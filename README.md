@@ -102,6 +102,8 @@ The database seeds automatically on first run with sample data:
 
 ## Integration API
 
+> **Full API documentation:** See the [API Integration Guide](docs/API-GUIDE.md) for detailed endpoint references, request/response examples, authentication setup, error codes, and outbound polling configuration.
+
 The integration API allows external systems — such as a student information system, enrollment platform, or workflow engine — to push step-completion data into the application. This is the recommended way to keep student progress in sync across systems.
 
 All integration endpoints require an API key passed as either:

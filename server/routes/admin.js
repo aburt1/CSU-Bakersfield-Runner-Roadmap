@@ -839,19 +839,19 @@ router.get('/analytics/deadline-risk', async (req, res, next) => {
     const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
     const days = parseInt(req.query.days, 10) || 14;
 
-    const termFilter = termId ? 'AND s.term_id = $1' : '';
-    const params = termId ? [termId] : [];
+    const params = [days];
+    const termFilter = termId ? `AND s.term_id = $${params.push(termId)}` : '';
 
     const steps = await req.db.queryAll(
       `SELECT s.id, s.title, s.deadline_date,
         COUNT(DISTINCT st.id) as total_students,
-        COUNT(DISTINCT CASE WHEN sp.status != 'completed' THEN st.id END) as at_risk_count
+        COUNT(DISTINCT CASE WHEN sp.status IS NULL OR sp.status != 'completed' THEN st.id END) as at_risk_count
        FROM steps s
        JOIN students st ON st.term_id = s.term_id
        LEFT JOIN student_progress sp ON sp.step_id = s.id AND sp.student_id = st.id
        WHERE s.is_active = 1 AND s.deadline_date IS NOT NULL
-         AND s.deadline_date <= NOW() + INTERVAL '${days} days'
-         AND s.deadline_date > NOW() ${termFilter}
+         AND s.deadline_date::date <= (CURRENT_DATE + make_interval(days => $1))
+         AND s.deadline_date::date > CURRENT_DATE ${termFilter}
        GROUP BY s.id, s.title, s.deadline_date
        ORDER BY s.deadline_date ASC`,
       params
@@ -862,7 +862,7 @@ router.get('/analytics/deadline-risk', async (req, res, next) => {
       let students = [];
       if (termId) {
         students = await req.db.queryAll(
-          `SELECT st.id, st.name, st.email
+          `SELECT st.id, st.display_name, st.email
            FROM students st
            LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
            WHERE st.term_id = $2 AND (sp.status IS NULL OR sp.status != 'completed')`,
@@ -870,7 +870,7 @@ router.get('/analytics/deadline-risk', async (req, res, next) => {
         );
       } else {
         students = await req.db.queryAll(
-          `SELECT st.id, st.name, st.email
+          `SELECT st.id, st.display_name, st.email
            FROM students st
            LEFT JOIN student_progress sp ON sp.step_id = $1 AND sp.student_id = st.id
            WHERE sp.status IS NULL OR sp.status != 'completed'`,
@@ -895,20 +895,20 @@ router.get('/analytics/stalled-students', async (req, res, next) => {
     const termId = req.query.term_id ? parseInt(req.query.term_id, 10) : null;
     const days = parseInt(req.query.days, 10) || 7;
 
-    const termFilter = termId ? 'WHERE st.term_id = $1' : '';
-    const params = termId ? [termId] : [];
+    const params = [days];
+    const termFilter = termId ? `WHERE st.term_id = $${params.push(termId)}` : '';
 
     const students = await req.db.queryAll(
-      `SELECT st.id, st.name, st.email,
-        MAX(sp.updated_at) as last_completion_date,
+      `SELECT st.id, st.display_name, st.email,
+        MAX(sp.completed_at) as last_completion_date,
         COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) as completed_count
        FROM students st
        LEFT JOIN student_progress sp ON sp.student_id = st.id
        ${termFilter}
-       GROUP BY st.id, st.name, st.email
+       GROUP BY st.id, st.display_name, st.email
        HAVING COUNT(CASE WHEN sp.status = 'completed' THEN 1 END) = 0
-         OR MAX(sp.updated_at) < NOW() - INTERVAL '${days} days'
-       ORDER BY COALESCE(MAX(sp.updated_at), st.created_at) ASC`,
+         OR MAX(sp.completed_at) < NOW() - make_interval(days => $1)
+       ORDER BY COALESCE(MAX(sp.completed_at), st.created_at) ASC`,
       params
     );
 
@@ -942,19 +942,21 @@ router.get('/analytics/cohort-comparison', async (req, res, next) => {
 
     for (const tag of tags) {
       const tagPattern = `%${tag}%`;
-      const params = termId ? [tagPattern, termId] : [tagPattern];
+      const params = [tagPattern, totalSteps || 1];
+      const termFilter = termId ? `AND s.term_id = $${params.push(termId)}` : '';
 
       const cohortResult = await req.db.queryOne(
         `SELECT COUNT(DISTINCT s.id) as student_count,
-          ROUND(AVG(COALESCE(pc.done, 0)::float / ${totalSteps || 1}) * 100) as avg_completion_pct
+          ROUND(AVG(COALESCE(pc.done, 0)::float / $2) * 100) as avg_completion_pct
          FROM students s
          LEFT JOIN (
            SELECT student_id, COUNT(*) as done
            FROM student_progress sp
            JOIN steps st ON st.id = sp.step_id AND st.is_active = 1 AND COALESCE(st.is_optional, 0) = 0
+           WHERE sp.status = 'completed'
            GROUP BY student_id
          ) pc ON pc.student_id = s.id
-         WHERE (s.tags IS NULL OR s.tags LIKE $1) ${termId ? 'AND s.term_id = $2' : ''}`,
+         WHERE s.tags LIKE $1 ${termFilter}`,
         params
       );
 
@@ -978,7 +980,7 @@ router.get('/analytics/completion-velocity', async (req, res, next) => {
 
     const students = await req.db.queryAll(
       `SELECT st.id,
-        EXTRACT(DAY FROM MAX(sp.updated_at) - MIN(sp.updated_at)) as days_elapsed
+        EXTRACT(DAY FROM MAX(sp.completed_at) - MIN(sp.completed_at)) as days_elapsed
        FROM students st
        JOIN student_progress sp ON sp.student_id = st.id AND sp.status = 'completed'
        ${termId ? 'WHERE st.term_id = $1' : ''}
