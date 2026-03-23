@@ -63,16 +63,17 @@ export default function StudentDrillDown({ open, onClose, filterType, filterValu
   return createPortal(
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 bg-black/30 z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
+        <motion.div
+          key="drill-down-overlay"
+          className="fixed inset-0 z-40"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div className="absolute inset-0 bg-black/30" />
           <motion.div
             ref={panelRef}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl z-50 flex flex-col"
+            className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl z-50 flex flex-col"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -142,7 +143,7 @@ export default function StudentDrillDown({ open, onClose, filterType, filterValu
               )}
             </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body

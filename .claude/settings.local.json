@@ -34,7 +34,12 @@
       "Bash(grep -v \"parseInt\\\\|JSON.stringify\\\\|JSON.parse\\\\|p.next\\(\\)\\\\|$\\\\d\")",
       "Bash(grep -E '`.*req\\\\.\\(query|params|body\\).*\\\\$\\\\{' \"/c/Users/andre/Desktop/CSUB admissions/server/routes/admin.js\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(grep -n \"GET /stats\\\\|''/stats''\" /Users/aburt1/Desktop/roadmap/CSUB-admissions/server/routes/*.js)",
+      "Bash(psql postgresql://postgres:postgres@localhost:5432/csub_admissions -c \"SELECT title FROM steps WHERE id = 7;\")",
+      "Bash(psql postgresql://localhost:5432/csub_admissions -c \"SELECT title FROM steps WHERE id = 7;\")",
+      "Bash(psql postgresql://localhost:5432/csub_admissions -c \":*)",
+      "Bash(psql postgresql://localhost:5432/csub_admissions -c \"\\\\d student_progress\")"
     ]
   }
 }
