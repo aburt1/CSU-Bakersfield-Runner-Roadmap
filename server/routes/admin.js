@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { adminAuth } from '../middleware/adminAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { safeJsonParse } from '../utils/json.js';
@@ -1527,7 +1528,12 @@ router.get('/users', requireRole('sysadmin'), async (req, res, next) => {
 router.post('/users', requireRole('sysadmin'), async (req, res, next) => {
   try {
     const { email, password, role, displayName } = req.body;
-    if (!email || !password || !displayName) {
+    const azureAdConfigured = !!(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_TENANT_ID);
+
+    if (!email || !displayName) {
+      return res.status(400).json({ error: 'email and displayName required' });
+    }
+    if (!azureAdConfigured && !password) {
       return res.status(400).json({ error: 'email, password, and displayName required' });
     }
     const validRoles = ['viewer', 'admissions', 'admissions_editor', 'sysadmin'];
@@ -1540,7 +1546,9 @@ router.post('/users', requireRole('sysadmin'), async (req, res, next) => {
       return res.status(409).json({ error: 'Email already exists' });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    // When Azure AD is configured and no password provided, generate an unusable random hash
+    const hashSource = password || crypto.randomBytes(32).toString('hex');
+    const hash = await bcrypt.hash(hashSource, 10);
     const result = await req.db.execute(
       'INSERT INTO admin_users (email, password_hash, role, display_name) VALUES ($1, $2, $3, $4) RETURNING id',
       [email.toLowerCase().trim(), hash, role || 'viewer', displayName]
