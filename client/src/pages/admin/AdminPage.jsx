@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isAzureAdConfigured } from '../../auth/msalConfig';
 import { useAdminApi } from './hooks/useAdminApi';
 import AdminLogin from './AdminLogin';
 import StudentsTab from './StudentsTab';
