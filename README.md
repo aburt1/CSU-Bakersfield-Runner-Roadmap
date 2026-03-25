@@ -1,6 +1,6 @@
 # CSUB Admissions Guide — Road to Becoming a Roadrunner
 
-An interactive, road-themed student onboarding application for California State University, Bakersfield. Guides newly admitted students through every step of the admissions process — from acceptance to their first day of classes.
+An interactive student onboarding application for California State University, Bakersfield. Guides newly admitted students through every step of the admissions process — from acceptance to their first day of classes.
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)
