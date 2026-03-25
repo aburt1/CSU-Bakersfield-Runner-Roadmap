@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { authMiddleware, signToken } from '../middleware/auth.js';
+import { verifyAzureAdToken } from '../utils/azureAdToken.js';
 
 const router = Router();
 
@@ -54,6 +55,86 @@ router.post('/dev-login', async (req, res, next) => {
 
     const token = signToken(student.id, student.email);
 
+    res.json({
+      token,
+      student: {
+        id: student.id,
+        displayName: student.display_name,
+        email: student.email,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/sso - Azure AD SSO login
+router.post('/sso', async (req, res, next) => {
+  try {
+    if (!process.env.AZURE_AD_CLIENT_ID || !process.env.AZURE_AD_TENANT_ID) {
+      return res.status(501).json({ error: 'Azure AD SSO is not configured' });
+    }
+
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ error: 'idToken is required' });
+    }
+
+    let claims;
+    try {
+      claims = await verifyAzureAdToken(idToken);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const { oid, email, name } = claims;
+
+    // Find existing student by azure_id
+    let student = await req.db.queryOne(
+      'SELECT id, display_name, email FROM students WHERE azure_id = $1',
+      [oid]
+    );
+
+    if (student) {
+      // Update name/email from latest claims
+      await req.db.execute(
+        'UPDATE students SET display_name = $1, email = $2 WHERE id = $3',
+        [name, email, student.id]
+      );
+      student.display_name = name;
+      student.email = email;
+    } else {
+      // Create new student (uuidv4 is already imported at the top of auth.js)
+      const studentId = uuidv4();
+      const activeTerm = await req.db.queryOne(
+        'SELECT id FROM terms WHERE is_active = 1 ORDER BY id DESC LIMIT 1'
+      );
+      const termId = activeTerm?.id || null;
+
+      await req.db.execute(
+        `INSERT INTO students (id, display_name, email, azure_id, term_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [studentId, name, email, oid, termId]
+      );
+
+      // Auto-complete the accepted step
+      const acceptedStep = await req.db.queryOne(
+        `SELECT id FROM steps
+         WHERE term_id = $1 AND step_key = 'accepted'
+         ORDER BY id LIMIT 1`,
+        [termId]
+      );
+      if (acceptedStep?.id) {
+        await req.db.execute(
+          `INSERT INTO student_progress (student_id, step_id)
+           VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [studentId, acceptedStep.id]
+        );
+      }
+
+      student = { id: studentId, display_name: name, email };
+    }
+
+    const token = signToken(student.id, student.email);
     res.json({
       token,
       student: {
