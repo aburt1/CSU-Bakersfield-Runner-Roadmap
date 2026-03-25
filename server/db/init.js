@@ -81,6 +81,7 @@ export async function initDatabase() {
     'ALTER TABLE steps ADD COLUMN IF NOT EXISTS is_optional INTEGER DEFAULT 0',
     'ALTER TABLE students ADD COLUMN IF NOT EXISTS last_api_check_at TIMESTAMPTZ',
     "ALTER TABLE student_progress ADD COLUMN IF NOT EXISTS completed_by VARCHAR(20) DEFAULT 'manual'",
+    'ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS azure_id TEXT UNIQUE',
   ];
   for (const sql of migrations) {
     await db.execute(sql);
