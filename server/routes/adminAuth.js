@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { adminAuth } from '../middleware/adminAuth.js';
+import { verifyAzureAdToken } from '../utils/azureAdToken.js';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 
@@ -111,6 +112,92 @@ router.post('/change-password', adminAuth, async (req, res, next) => {
     await req.db.execute('UPDATE admin_users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
 
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/auth/sso — Azure AD SSO login for admins
+router.post('/sso', async (req, res, next) => {
+  const azureClientId = process.env.AZURE_AD_CLIENT_ID;
+  const azureTenantId = process.env.AZURE_AD_TENANT_ID;
+
+  if (!azureClientId || !azureTenantId) {
+    return res.status(501).json({ error: 'Azure AD is not configured' });
+  }
+
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ error: 'idToken is required' });
+    }
+
+    // Validate the Azure AD ID token
+    let claims;
+    try {
+      claims = await verifyAzureAdToken(idToken);
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const { oid, email, name } = claims;
+
+    // Look up admin by azure_id first, then by email
+    let admin = await req.db.queryOne(
+      'SELECT * FROM admin_users WHERE azure_id = $1',
+      [oid]
+    );
+
+    if (!admin && email) {
+      admin = await req.db.queryOne(
+        'SELECT * FROM admin_users WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
+    }
+
+    if (!admin) {
+      return res.status(403).json({ error: 'No admin account found. Contact your system administrator.' });
+    }
+
+    // Check active status BEFORE linking azure_id
+    if (!admin.is_active) {
+      return res.status(403).json({ error: 'Account is inactive' });
+    }
+
+    // Link azure_id on first SSO login (found by email)
+    if (!admin.azure_id) {
+      await req.db.execute(
+        'UPDATE admin_users SET azure_id = $1 WHERE id = $2',
+        [oid, admin.id]
+      );
+    }
+
+    // Update display name from latest claims
+    if (name && name !== admin.display_name) {
+      await req.db.execute(
+        'UPDATE admin_users SET display_name = $1 WHERE id = $2',
+        [name, admin.id]
+      );
+    }
+
+    const token = jwt.sign(
+      {
+        adminId: admin.id,
+        role: admin.role,
+        email: admin.email,
+        displayName: name || admin.display_name,
+      },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: admin.id,
+        email: admin.email,
+        displayName: name || admin.display_name,
+        role: admin.role,
+      },
+    });
   } catch (err) { next(err); }
 });
 
