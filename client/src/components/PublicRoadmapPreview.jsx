@@ -3,8 +3,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TimelineStep from './roadmap/TimelineStep';
 import StepDetailPanel from './roadmap/StepDetailPanel';
 import HelpSection from './roadmap/HelpSection';
+import { useAuth } from '../auth/AuthProvider';
 
 export default function PublicRoadmapPreview({ onLogin }) {
+  const { ssoLogin, ssoLoading, ssoError, isAzureAdConfigured } = useAuth();
   const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -55,47 +57,93 @@ export default function PublicRoadmapPreview({ onLogin }) {
     );
   }
 
-  // Compact inline login form (reused in multiple places)
+  const devLoginForm = (
+    <form onSubmit={handleLogin} className="flex flex-wrap items-end gap-3" aria-describedby={loginError ? 'login-error' : undefined}>
+      <div className="flex-1 min-w-[120px]">
+        <label htmlFor="login-name" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Name</label>
+        <input
+          id="login-name"
+          type="text"
+          required
+          value={loginName}
+          onChange={(e) => setLoginName(e.target.value)}
+          placeholder="Jane Doe"
+          className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
+        />
+      </div>
+      <div className="flex-1 min-w-[160px]">
+        <label htmlFor="login-email" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Email</label>
+        <input
+          id="login-email"
+          type="email"
+          required
+          value={loginEmail}
+          onChange={(e) => setLoginEmail(e.target.value)}
+          placeholder="jdoe@csub.edu"
+          className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={loggingIn}
+        className="px-5 py-2 bg-csub-blue hover:bg-csub-blue-dark text-white rounded-lg font-body text-sm font-semibold transition-colors duration-200 disabled:opacity-50 whitespace-nowrap"
+      >
+        {loggingIn ? 'Signing in...' : 'Sign In'}
+      </button>
+    </form>
+  );
+
+  const showDevLogin = import.meta.env.VITE_ALLOW_DEV_LOGIN !== 'false';
+
   const loginForm = (
     <div className="ml-12 sm:ml-14 my-4 p-4 bg-csub-blue/5 rounded-xl border border-csub-blue/10">
       <p className="font-body text-sm font-semibold text-csub-blue-dark mb-3">
-        Activated your CSUB account? Sign in to track your progress.
+        {isAzureAdConfigured
+          ? 'Sign in with your CSUB account to track your progress.'
+          : 'Activated your CSUB account? Sign in to track your progress.'}
       </p>
-      <form onSubmit={handleLogin} className="flex flex-wrap items-end gap-3" aria-describedby={loginError ? 'login-error' : undefined}>
-        <div className="flex-1 min-w-[120px]">
-          <label htmlFor="login-name" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Name</label>
-          <input
-            id="login-name"
-            type="text"
-            required
-            value={loginName}
-            onChange={(e) => setLoginName(e.target.value)}
-            placeholder="Jane Doe"
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
-          />
+
+      {/* SSO Button — only when Azure AD is configured */}
+      {isAzureAdConfigured && (
+        <>
+          <button
+            type="button"
+            onClick={ssoLogin}
+            disabled={ssoLoading}
+            className="w-full px-5 py-3 bg-csub-blue hover:bg-csub-blue-dark text-white rounded-lg font-body text-sm font-bold transition-colors duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {ssoLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                Signing in...
+              </>
+            ) : (
+              'Sign in with CSUB Account'
+            )}
+          </button>
+          {ssoError && (
+            <p role="alert" className="text-red-600 text-sm font-body mt-2">{ssoError}</p>
+          )}
+        </>
+      )}
+
+      {/* Divider — shown when both SSO and dev login are visible */}
+      {isAzureAdConfigured && showDevLogin && (
+        <div className="flex items-center gap-3 my-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs font-body text-gray-400">or</span>
+          <div className="flex-1 h-px bg-gray-200" />
         </div>
-        <div className="flex-1 min-w-[160px]">
-          <label htmlFor="login-email" className="block font-body text-xs font-semibold text-csub-blue-dark/70 mb-1">Email</label>
-          <input
-            id="login-email"
-            type="email"
-            required
-            value={loginEmail}
-            onChange={(e) => setLoginEmail(e.target.value)}
-            placeholder="jdoe@csub.edu"
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loggingIn}
-          className="px-5 py-2 bg-csub-blue hover:bg-csub-blue-dark text-white rounded-lg font-body text-sm font-semibold transition-colors duration-200 disabled:opacity-50 whitespace-nowrap"
-        >
-          {loggingIn ? 'Signing in...' : 'Sign In'}
-        </button>
-      </form>
-      {loginError && (
-        <p id="login-error" role="alert" className="text-red-600 text-sm font-body mt-2">{loginError}</p>
+      )}
+
+      {/* Dev login form */}
+      {showDevLogin && (
+        <>
+          {devLoginForm}
+          {loginError && (
+            <p id="login-error" role="alert" className="text-red-600 text-sm font-body mt-2">{loginError}</p>
+          )}
+        </>
       )}
     </div>
   );
