@@ -13,12 +13,16 @@ The application has two separate authentication systems:
 - **Note:** Azure AD SSO is also implemented and available — disabled by default (see below)
 
 ### Admin Authentication
-- **Method:** Email/password login (`POST /api/admin-auth/login`)
-- **How it works:** Admins log in with email and bcrypt-hashed password. The server returns a JWT with role info.
+- **Method:** Azure AD SSO (when configured) or email/password login
+- **SSO endpoint:** `POST /api/admin/auth/sso` — validates Azure AD ID token, looks up admin by `azure_id` or email
+- **Password endpoint:** `POST /api/admin/auth/login` — email/password login (shown when Azure AD not configured)
+- **Break-glass:** `POST /api/admin/auth/local-login` at `/admin/local-login` — hidden emergency login, gated by `ADMIN_BREAK_GLASS_USERNAME` and `ADMIN_BREAK_GLASS_PASSWORD` env vars
+- **Account linking:** First SSO login matches admin by email, then links `azure_id` for future logins
+- **No auto-creation:** Admin accounts must be pre-created in the Users tab. SSO handles authentication only.
 - **Token storage:** `sessionStorage`
 - **Token lifetime:** 8 hours
 - **RBAC roles:** `viewer`, `admissions`, `admissions_editor`, `sysadmin`
-- **Where:** `client/src/pages/admin/AdminLogin.jsx`, `server/routes/adminAuth.js`
+- **Where:** `client/src/pages/admin/AdminLogin.jsx`, `client/src/pages/admin/AdminLocalLogin.jsx`, `server/routes/adminAuth.js`
 
 ### Integration Authentication
 - **Method:** API key (`X-Integration-Key` header or `Bearer` token)
@@ -64,6 +68,10 @@ JWT_SECRET=change-this-to-a-secure-random-string
 # Admin API Key (for external systems to update student progress)
 ADMIN_API_KEY=change-this-to-a-secure-random-key
 
+# Break-Glass Admin Login (both must be set to enable /admin/local-login)
+ADMIN_BREAK_GLASS_USERNAME=
+ADMIN_BREAK_GLASS_PASSWORD=
+
 # Database (PostgreSQL)
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/csub_admissions
 ```
@@ -101,7 +109,14 @@ VITE_ALLOW_DEV_LOGIN=true
 - [ ] Set `API_CHECK_ENCRYPTION_KEY` (64-character hex string) for outbound API credential encryption
 - [ ] Review rate limiting settings (currently 200 requests per 15 minutes)
 
-### 3. Optional Enhancements
-- Admin SSO: Extend Azure AD integration to admin login (currently email/password only)
+### 3. Admin SSO Setup (when enabling Azure AD)
+- Admin accounts must be pre-created in the Users tab (name, email, role)
+- On first SSO login, the admin's `azure_id` is linked automatically via email match
+- Password field is hidden in the Users tab when Azure AD is configured
+- The break-glass login at `/admin/local-login` requires both `ADMIN_BREAK_GLASS_USERNAME` and `ADMIN_BREAK_GLASS_PASSWORD` to be set
+- [ ] Set `ADMIN_BREAK_GLASS_USERNAME` to a non-obvious username
+- [ ] Set `ADMIN_BREAK_GLASS_PASSWORD` to a strong random password (at least 32 characters)
+
+### 4. Optional Enhancements
 - Token refresh: Implement silent token renewal before expiration using MSAL's `acquireTokenSilent`
 - Session management: Add "remember me" option with `localStorage` instead of `sessionStorage`
