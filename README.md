@@ -56,8 +56,8 @@ Admissions staff manage students, steps, analytics, audit logs, terms, and user 
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | React 18, Vite 6, Tailwind CSS 3, Framer Motion, Recharts, Tiptap, DOMPurify |
-| **Backend** | Node.js, Express 4, PostgreSQL, JWT authentication |
-| **Auth** | Azure AD SSO integration, JWT sessions, bcrypt password hashing |
+| **Backend** | Node.js 20, Express 4, PostgreSQL 16 |
+| **Auth** | JWT sessions, bcrypt password hashing (Azure AD SSO planned — see [Auth Roadmap](docs/AUTH-ROADMAP.md)) |
 | **Security** | Helmet, CORS, express-rate-limit, AES-256-GCM credential encryption |
 | **Deployment** | Docker containerized single-process server (serves API + static frontend) |
 
@@ -65,47 +65,46 @@ Admissions staff manage students, steps, analytics, audit logs, terms, and user 
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 20+
-- npm 9+
-
-### Installation
+See the **[Development Setup Guide](docs/SETUP.md)** for detailed instructions.
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/CSUB-admissions.git
-cd CSUB-admissions
-
 # Install all dependencies (root, client, and server)
-npm install
+npm run install:all
 
 # Start both dev servers (client on :3000, server on :3001)
 npm run dev
 ```
 
-The client runs at [http://localhost:3000](http://localhost:3000) and proxies API requests to the server at port 3001.
+The client runs at [http://localhost:3000](http://localhost:3000) and proxies API requests to the server at port 3001. The database schema, migrations, and seed data are applied automatically on first start.
 
 ### Default Credentials
-
-The database seeds automatically on first run with sample data:
 
 | Account | Email | Password |
 |---------|-------|----------|
 | Admin (sysadmin) | `admin@csub.edu` | `admin123` |
-| Sample students | `marcot@csub.edu`, etc. | Dev login (name + email) |
+| Sample students | Various `@csub.edu` emails | Dev login (name + email) |
 
-> **Note:** Change the default admin password and JWT secret before deploying to production.
+> **Warning:** Change the default admin password and JWT secret before deploying to production. See [Auth Roadmap](docs/AUTH-ROADMAP.md) for the production security checklist.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Development Setup Guide](docs/SETUP.md)** | Prerequisites, installation, environment variables, running locally |
+| **[Auth Roadmap](docs/AUTH-ROADMAP.md)** | Current auth state, Azure AD SSO plan, production security checklist |
+| **[API Integration Guide](docs/API-GUIDE.md)** | Integration API reference (inbound push + outbound poll) |
 
 ---
 
 ## Integration API
 
-The app supports two integration patterns for connecting with external systems. See the **[API Integration Guide](docs/API-GUIDE.md)** for full endpoint references, request/response examples, authentication details, error codes, and setup instructions.
+The app supports two integration patterns for connecting with external systems. See the **[API Integration Guide](docs/API-GUIDE.md)** for full details.
 
 ### Inbound — Push Data In
 
-External systems (e.g., PeopleSoft) call our API to update student step completions. Authenticated via integration key (`X-Integration-Key` header or `Bearer` token). A dev key is seeded automatically on first run.
+External systems (e.g., PeopleSoft) call our API to update student step completions. Authenticated via integration key (`X-Integration-Key` header or `Bearer` token).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -113,37 +112,15 @@ External systems (e.g., PeopleSoft) call our API to update student step completi
 | `PUT` | `/api/integrations/v1/step-completions` | Update one student's step status |
 | `POST` | `/api/integrations/v1/step-completions/batch` | Batch update multiple completions |
 
-Key concepts: students identified by emplid (`student_id_number`), steps by `step_key`, all requests require a `source_event_id` for idempotent retries.
-
 ### Outbound — Poll External APIs
 
-The app can poll external HTTP endpoints to auto-check whether a student has completed a step. Sysadmins configure a URL template (with `{{studentId}}` placeholder), auth credentials, and a response field path per step. When a student triggers a check, the app calls each configured endpoint and marks steps based on the response.
+The app can poll external HTTP endpoints to auto-check whether a student has completed a step. Configurable per step with encrypted credentials.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `PUT` | `/api/admin/steps/:id/api-check` | Configure an outbound check (sysadmin) |
 | `POST` | `/api/admin/steps/:id/api-check/test` | Test a check with a sample student (sysadmin) |
 | `POST` | `/api/roadmap/run-api-checks` | Student triggers a check run (5-min cooldown) |
-
-## API Overview
-
-All routes are prefixed with `/api/`. See the [API Integration Guide](docs/API-GUIDE.md) for integration endpoints.
-
-| Route | Description |
-|-------|-------------|
-| `POST /api/auth/dev-login` | Student dev login |
-| `GET /api/steps` | List active admissions steps |
-| `GET /api/steps/progress` | Student progress (authenticated) |
-| `PUT /api/steps/:stepId/status` | Student self-service update for optional steps |
-| `POST /api/roadmap/run-api-checks` | Trigger outbound API checks (student) |
-| `GET /api/admin/students` | Paginated student list (admin) |
-| `POST /api/admin/students/:studentId/steps/:stepId/complete` | Mark step completed or waived (admin) |
-| `DELETE /api/admin/students/:studentId/steps/:stepId/complete` | Remove completion (admin) |
-| `PUT /api/admin/steps/reorder` | Reorder steps (editor+) |
-| `GET /api/admin/analytics/*` | Charts and stats (admin) |
-| `GET /api/admin/audit` | Audit log with filters (admin) |
-| `GET /api/admin/export/progress` | CSV export (admin) |
-| `PUT /api/admin/steps/:id/api-check` | Configure outbound API check (sysadmin) |
 
 ---
 
@@ -156,13 +133,6 @@ Each student's roadmap is built from four things:
 3. **Manual + derived tags** — manual tags are managed by staff, derived tags come from profile fields like applicant type and residency
 4. **Progress records** — completion, waiver, or removal changes the student's status on a step
 
-That means "updating a student's step list" can mean any of the following:
-
-- changing the student's term
-- changing the student's manual tags
-- changing the step's visibility rules
-- marking a step complete, waived, or not completed
-
 ---
 
 ## Project Structure
@@ -171,12 +141,12 @@ That means "updating a student's step list" can mean any of the following:
 CSUB-admissions/
 ├── client/                     # React SPA (Vite)
 │   ├── src/
-│   │   ├── auth/               # Auth context + SSO config
+│   │   ├── auth/               # Auth context
 │   │   ├── components/         # Shared UI (Header, StepCard, roadmap/)
 │   │   ├── hooks/              # useProgress custom hook
 │   │   └── pages/
 │   │       ├── RoadmapPage.jsx # Main student view
-│   │       └── admin/          # Admin dashboard (6 tabs)
+│   │       └── admin/          # Admin dashboard (5 tabs)
 │   ├── tailwind.config.js
 │   └── vite.config.js
 │
@@ -188,33 +158,15 @@ CSUB-admissions/
 │   └── index.js                # App entry point
 │
 ├── docs/                       # Documentation
-│   ├── API-GUIDE.md            # Integration API guide (inbound + outbound)
+│   ├── API-GUIDE.md            # Integration API guide
+│   ├── AUTH-ROADMAP.md         # Authentication roadmap
+│   ├── SETUP.md                # Development setup guide
 │   └── screenshots/            # App screenshots
 │
 ├── docker-compose.yml          # Docker services
 ├── Dockerfile                  # Container build
 └── package.json                # Root scripts (dev, build, start)
 ```
-
----
-
-## Environment Variables
-
-Create a `.env` file in `server/`:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3001` |
-| `NODE_ENV` | Environment | `development` |
-| `CORS_ORIGIN` | Allowed origin for CORS | `http://localhost:3000` |
-| `JWT_SECRET` | Secret key for JWT signing | `dev-secret-key-change-in-production` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://localhost:5432/admissions` |
-| `ADMIN_DEFAULT_EMAIL` | Default admin email (seeded on first run) | `admin@csub.edu` |
-| `ADMIN_DEFAULT_PASSWORD` | Default admin password | `admin123` |
-| `INTEGRATION_DEFAULT_NAME` | Seeded dev integration client name | `PeopleSoft Dev` |
-| `INTEGRATION_DEFAULT_KEY` | Seeded dev integration API key | `dev-integration-key` |
-| `API_CHECK_ENCRYPTION_KEY` | 64-char hex key for encrypting outbound API check credentials | — |
-| `ALLOW_DEV_LOGIN` | Allow `POST /api/auth/dev-login` in production | `false` |
 
 ---
 
@@ -228,7 +180,15 @@ npm run build
 npm start
 ```
 
-In production, the Express server serves the built client from `client/dist/` and handles all API routes. The application runs as a single process — no separate web server is required. It is compatible with any container-based hosting platform.
+In production, the Express server serves the built client from `client/dist/` and handles all API routes. The application runs as a single process — no separate web server is required. Compatible with any container-based hosting platform.
+
+### Docker
+
+```bash
+docker-compose up
+```
+
+See [SETUP.md](docs/SETUP.md) for environment variable configuration.
 
 ---
 

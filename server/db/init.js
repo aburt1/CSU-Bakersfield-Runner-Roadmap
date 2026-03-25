@@ -113,7 +113,7 @@ export async function initDatabase() {
     );
     await db.execute('UPDATE steps SET term_id = 1 WHERE term_id IS NULL');
     await db.execute('UPDATE students SET term_id = 1 WHERE term_id IS NULL');
-    console.log('Seeded default term: Fall 2026');
+    // Default term seeded: Fall 2026
   }
 
   // Create admin_users table
@@ -179,12 +179,14 @@ export async function initDatabase() {
     const bcrypt = await import('bcrypt');
     const email = process.env.ADMIN_DEFAULT_EMAIL || 'admin@csub.edu';
     const password = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
+    if (!process.env.ADMIN_DEFAULT_PASSWORD && process.env.NODE_ENV === 'production') {
+      console.warn('[db-init] WARNING: Using default admin password in production. Set ADMIN_DEFAULT_PASSWORD env var.');
+    }
     const hash = await bcrypt.hash(password, 10);
     await db.execute(
       'INSERT INTO admin_users (email, password_hash, role, display_name) VALUES ($1, $2, $3, $4)',
       [email, hash, 'sysadmin', 'Admin']
     );
-    console.log(`Seeded default sysadmin: ${email}`);
   }
 
   // Seed default integration client in dev or when explicitly configured.
@@ -199,11 +201,7 @@ export async function initDatabase() {
       [clientName, keyHash]
     );
 
-    if (process.env.NODE_ENV !== 'production' && !process.env.INTEGRATION_DEFAULT_KEY) {
-      console.log(`Seeded default integration client "${clientName}" with key: ${clientKey}`);
-    } else {
-      console.log(`Seeded default integration client "${clientName}"`);
-    }
+    // Default integration client seeded
   }
 
   // Seed default Fall 2026 checklist if empty
@@ -213,7 +211,7 @@ export async function initDatabase() {
     const seedTermId = defaultTerm?.id || null;
     if (seedTermId) {
       const importResult = await importFall2026Checklist(db, seedTermId, { deactivateUnmatched: false });
-      console.log(`Seeded Fall 2026 onboarding checklist (${importResult.steps.length} steps)`);
+      // Fall 2026 onboarding checklist seeded
     }
   }
 
@@ -246,9 +244,9 @@ export async function initDatabase() {
     ON steps (term_id, step_key)
   `);
 
-  // Seed 50 sample students if empty
+  // Seed 50 sample students if empty (development only)
   const studentCount = await db.queryOne('SELECT COUNT(*) as count FROM students');
-  if (parseInt(studentCount.count) === 0) {
+  if (parseInt(studentCount.count) === 0 && process.env.NODE_ENV !== 'production') {
     const defaultTerm = await db.queryOne('SELECT id FROM terms WHERE is_active = 1 ORDER BY id LIMIT 1');
     const termId = defaultTerm?.id || 1;
     const stepRows = await db.queryAll(
@@ -360,7 +358,7 @@ export async function initDatabase() {
       }
     });
 
-    console.log('Seeded 50 sample students with realistic progress');
+    // 50 sample students seeded
   }
 
   return db;
