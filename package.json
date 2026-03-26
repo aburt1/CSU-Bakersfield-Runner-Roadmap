@@ -10,7 +10,8 @@
     "build": "cd client && npm run build",
     "start": "cd server && npm start",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "import:fall-2026-checklist": "cd server && npm run import:fall-2026-checklist"
+    "import:fall-2026-checklist": "cd server && npm run import:fall-2026-checklist",
+    "seed": "cd server && node db/seed.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
