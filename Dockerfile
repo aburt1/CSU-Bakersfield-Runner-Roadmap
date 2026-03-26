@@ -10,7 +10,7 @@ RUN cd client && npm ci && cd ../server && npm ci
 # Copy source and build client
 COPY client/ ./client/
 COPY server/ ./server/
-RUN cd client && npm run build
+RUN cd client && NODE_OPTIONS="--max-old-space-size=512" npm run build
 
 # Production image
 FROM node:20-alpine
