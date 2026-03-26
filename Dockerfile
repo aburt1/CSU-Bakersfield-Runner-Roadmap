@@ -20,9 +20,9 @@ WORKDIR /app
 COPY --from=build /app/server/ ./server/
 COPY --from=build /app/client/dist/ ./client/dist/
 
-RUN cd server && npm ci --omit=dev
+RUN cd server && npm ci
 
 EXPOSE 3001
 
 # Seed demo data on first start (idempotent — ON CONFLICT DO NOTHING), then start server
-CMD ["sh", "-c", "cd server && node db/seed.js --force --once && cd /app && node server/index.js"]
+CMD ["sh", "-c", "cd server && npx tsx db/seed.ts --force --once && cd /app && npx tsx server/index.ts"]

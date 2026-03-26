@@ -1,0 +1,303 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { integrationAuth } from '../middleware/integrationAuth.js';
+import { safeJsonParse } from '../utils/json.js';
+import { logAudit } from '../utils/audit.js';
+import {
+  applyStudentProgressChange,
+  normalizeStudentIdNumber,
+  resolveStepForStudentByKey,
+  resolveStudentByStudentIdNumber,
+} from '../utils/progress.js';
+import { normalizeStepKey } from '../utils/stepKeys.js';
+import type { Db } from '../types/db.js';
+
+const router = Router();
+
+router.use(integrationAuth);
+
+const ERROR_STATUS: Record<string, number> = {
+  invalid_student_id_number: 400,
+  invalid_step_key: 400,
+  student_term_missing: 409,
+  student_not_found: 404,
+  step_not_found: 404,
+  step_inactive: 409,
+  duplicate_student_id_number: 409,
+};
+
+interface CompletionItem {
+  student_id_number?: string;
+  step_key?: string;
+  status?: string;
+  source_event_id?: string;
+  note?: string;
+  completed_at?: string;
+}
+
+interface Outcome {
+  httpStatus: number;
+  body: Record<string, unknown>;
+}
+
+async function getStoredIntegrationEvent(db: Db, integrationClientId: number, sourceEventId: string): Promise<Outcome | null> {
+  const row = await db.queryOne<{ response_status: number; response_body: string }>(
+    `SELECT response_status, response_body
+     FROM integration_events
+     WHERE integration_client_id = $1 AND source_event_id = $2`,
+    [integrationClientId, sourceEventId]
+  );
+
+  if (!row) return null;
+
+  return {
+    httpStatus: row.response_status,
+    body: safeJsonParse(row.response_body, { success: false, error: 'Stored response unavailable' }),
+  };
+}
+
+async function storeIntegrationEvent(
+  db: Db,
+  integrationClientId: number,
+  sourceEventId: string,
+  item: CompletionItem,
+  outcome: Outcome,
+): Promise<Outcome> {
+  try {
+    await db.execute(
+      `INSERT INTO integration_events (
+        integration_client_id,
+        source_event_id,
+        student_id_number,
+        step_key,
+        request_body,
+        response_status,
+        response_body
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        integrationClientId,
+        sourceEventId,
+        normalizeStudentIdNumber(item.student_id_number) || null,
+        normalizeStepKey(item.step_key || '') || null,
+        JSON.stringify(item),
+        outcome.httpStatus,
+        JSON.stringify(outcome.body),
+      ]
+    );
+
+    return outcome;
+  } catch {
+    return await getStoredIntegrationEvent(db, integrationClientId, sourceEventId) || outcome;
+  }
+}
+
+function buildFailure(
+  item: CompletionItem,
+  error: string,
+  code: string,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    success: false,
+    student_id_number: normalizeStudentIdNumber(item.student_id_number) || null,
+    step_key: normalizeStepKey(item.step_key || '') || null,
+    status: item.status || null,
+    source_event_id: item.source_event_id || null,
+    result: 'failed',
+    error,
+    code,
+    ...extra,
+  };
+}
+
+async function finalizeOutcome(
+  req: Request,
+  item: CompletionItem,
+  outcome: Outcome,
+  { persist = true }: { persist?: boolean } = {},
+): Promise<Outcome> {
+  if (!persist || !item?.source_event_id) {
+    return outcome;
+  }
+
+  return await storeIntegrationEvent(
+    req.db,
+    req.integrationClient!.id,
+    item.source_event_id,
+    item,
+    outcome
+  );
+}
+
+async function processCompletionItem(req: Request, item: unknown): Promise<Outcome> {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return {
+      httpStatus: 400,
+      body: { success: false, result: 'failed', error: 'Each item must be an object' },
+    };
+  }
+
+  const completionItem = item as CompletionItem;
+  const sourceEventId = String(completionItem.source_event_id || '').trim();
+  if (!sourceEventId) {
+    return {
+      httpStatus: 400,
+      body: buildFailure(completionItem, 'source_event_id is required', 'invalid_source_event_id'),
+    };
+  }
+
+  const storedEvent = await getStoredIntegrationEvent(req.db, req.integrationClient!.id, sourceEventId);
+  if (storedEvent) {
+    return storedEvent;
+  }
+
+  if (!['completed', 'waived', 'not_completed'].includes(completionItem.status || '')) {
+    return {
+      httpStatus: 400,
+      body: buildFailure(completionItem, 'status must be completed, waived, or not_completed', 'invalid_status'),
+    };
+  }
+
+  const studentResolution = await resolveStudentByStudentIdNumber(req.db, completionItem.student_id_number);
+  if (studentResolution.error) {
+    return await finalizeOutcome(req, completionItem, {
+      httpStatus: ERROR_STATUS[studentResolution.errorCode] || 400,
+      body: buildFailure(completionItem, studentResolution.error, studentResolution.errorCode),
+    });
+  }
+
+  const student = studentResolution.student!;
+  const studentIdNumber = studentResolution.studentIdNumber!;
+  const stepResolution = await resolveStepForStudentByKey(req.db, student, completionItem.step_key || '');
+  if (stepResolution.error) {
+    return await finalizeOutcome(req, completionItem, {
+      httpStatus: ERROR_STATUS[stepResolution.errorCode] || 400,
+      body: buildFailure(completionItem, stepResolution.error, stepResolution.errorCode, {
+        student_id: student.id,
+      }),
+    });
+  }
+
+  const step = stepResolution.step!;
+  const stepKey = stepResolution.stepKey!;
+  const progressChange = await applyStudentProgressChange(req.db, {
+    studentId: student.id,
+    stepId: step.id,
+    status: completionItem.status as 'completed' | 'waived' | 'not_completed',
+    note: completionItem.note,
+    completedAt: completionItem.completed_at,
+    completedBy: 'integration',
+  });
+
+  if (progressChange.error) {
+    return {
+      httpStatus: 400,
+      body: buildFailure(completionItem, progressChange.error, 'invalid_completed_at', {
+        student_id: student.id,
+        step_id: step.id,
+      }),
+    };
+  }
+
+  const responseBody = {
+    success: true,
+    student_id_number: studentIdNumber,
+    step_key: stepKey,
+    student_id: student.id,
+    step_id: step.id,
+    status: progressChange.status,
+    result: progressChange.result,
+    completed_at: progressChange.completedAt,
+    source_event_id: sourceEventId,
+  };
+
+  if (progressChange.result !== 'noop') {
+    await logAudit(req.db, req, {
+      entityType: 'student_progress',
+      entityId: student.id,
+      action: completionItem.status === 'waived'
+        ? 'integration_waive'
+        : completionItem.status === 'not_completed'
+          ? 'integration_uncomplete'
+          : 'integration_complete',
+      details: {
+        source_system: req.integrationClient!.name,
+        source_event_id: sourceEventId,
+        studentName: student.display_name,
+        student_id_number: studentIdNumber,
+        stepId: step.id,
+        stepTitle: step.title,
+        step_key: stepKey,
+        result: progressChange.result,
+        note: completionItem.note || null,
+      },
+    });
+  }
+
+  return await finalizeOutcome(req, completionItem, {
+    httpStatus: 200,
+    body: responseBody,
+  });
+}
+
+router.put('/step-completions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const outcome = await processCompletionItem(req, req.body || {});
+    return res.status(outcome.httpStatus).json(outcome.body);
+  } catch (err) { next(err); }
+});
+
+router.post('/step-completions/batch', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items must be a non-empty array' });
+    }
+
+    const results: Record<string, unknown>[] = [];
+    for (const item of items) {
+      const outcome = await processCompletionItem(req, item);
+      results.push(outcome.body);
+    }
+    const succeeded = results.filter((item) => item.success).length;
+    const failed = results.length - succeeded;
+
+    return res.json({
+      success: true,
+      items: results,
+      summary: {
+        total: results.length,
+        succeeded,
+        failed,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/step-catalog', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const termId = req.query.term_id ? parseInt(req.query.term_id as string, 10) : null;
+    if (req.query.term_id && !termId) {
+      return res.status(400).json({ error: 'term_id must be a valid number' });
+    }
+
+    const rows = termId
+      ? await req.db.queryAll<{ term_id: number; term_name: string; step_key: string; title: string; is_active: number }>(
+          `SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
+           FROM steps s
+           JOIN terms t ON t.id = s.term_id
+           WHERE s.term_id = $1
+           ORDER BY s.sort_order, s.id`,
+          [termId]
+        )
+      : await req.db.queryAll<{ term_id: number; term_name: string; step_key: string; title: string; is_active: number }>(
+          `SELECT s.term_id, t.name as term_name, s.step_key, s.title, COALESCE(s.is_active, 1) as is_active
+           FROM steps s
+           JOIN terms t ON t.id = s.term_id
+           ORDER BY t.created_at DESC, s.sort_order, s.id`
+        );
+
+    return res.json(rows);
+  } catch (err) { next(err); }
+});
+
+export default router;
