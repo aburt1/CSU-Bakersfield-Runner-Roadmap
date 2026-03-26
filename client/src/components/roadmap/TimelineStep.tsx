@@ -77,7 +77,7 @@ interface Props {
 }
 
 export default function TimelineStep({ step, index, completedAt, isLast, onSelect }: Props): React.ReactElement {
-  const config = STATUS_CONFIG[step.status] || STATUS_CONFIG.not_started;
+  const config = STATUS_CONFIG[step.status] ?? STATUS_CONFIG.not_started!;
   const links: LinkItem[] = step.links ? (typeof step.links === 'string' ? JSON.parse(step.links) : step.links) : [];
   const primaryAction = step.status === 'in_progress' && links.length > 0 ? links[0] : null;
   const isActive = step.status === 'in_progress';

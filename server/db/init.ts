@@ -311,8 +311,8 @@ export async function initDatabase(): Promise<Db> {
 
     await db.transaction(async (txDb: Db) => {
       for (let i = 0; i < 50; i++) {
-        const first = firstNames[i];
-        const last = lastNames[i % lastNames.length];
+        const first = firstNames[i]!;
+        const last = lastNames[i % lastNames.length]!;
         const name = `${first} ${last}`;
         const email = `${first.toLowerCase()}${last.toLowerCase().charAt(0)}@csub.edu`;
         const id = `seed-student-${String(i + 1).padStart(3, '0')}`;
@@ -326,7 +326,7 @@ export async function initDatabase(): Promise<Db> {
         const admitTerm = 'Fall 2026';
         const lastSyncedAt = new Date(Date.now() - (i % 10) * 3600000).toISOString();
 
-        const manualTags = manualTagOptions[i % manualTagOptions.length];
+        const manualTags = manualTagOptions[i % manualTagOptions.length]!;
 
         const daysAgo = Math.floor(Math.random() * 60) + 1;
         const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -348,7 +348,7 @@ export async function initDatabase(): Promise<Db> {
         const completableSteps = stepRows.slice(0, stepsCompleted);
 
         for (let j = 0; j < completableSteps.length; j++) {
-          const step = completableSteps[j];
+          const step = completableSteps[j]!;
           const completionDaysAgo = daysAgo - j * 2 - Math.floor(Math.random() * 3);
           const completedAt = new Date(Date.now() - Math.max(completionDaysAgo, 1) * 86400000).toISOString();
           const status = (Math.random() < 0.05) ? 'waived' : 'completed';

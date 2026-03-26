@@ -335,9 +335,9 @@ export default function TermStepsTab({ api, role = 'viewer', terms, selectedTerm
     if (swapIndex < 0 || swapIndex >= sorted.length) return;
 
     const order = sorted.map((step) => ({ id: step.id, sort_order: step.sort_order }));
-    const tempOrder = order[index].sort_order;
-    order[index].sort_order = order[swapIndex].sort_order;
-    order[swapIndex].sort_order = tempOrder;
+    const tempOrder = order[index]!.sort_order;
+    order[index]!.sort_order = order[swapIndex]!.sort_order;
+    order[swapIndex]!.sort_order = tempOrder;
 
     try {
       await api.put('/steps/reorder', { order });

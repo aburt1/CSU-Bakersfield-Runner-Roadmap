@@ -36,7 +36,7 @@ const INTEGRATION_ACTORS: string[] = ['PeopleSoft Dev', 'CRM Import', 'Admission
 const STAFF_ACTORS: string[] = ['Admin', 'Maria Santos', 'James Chen', 'Pat Williams'];
 
 // ── Helpers ────────────────────────────────────────────────────────────
-function pick<T>(arr: T[]): T { return arr[Math.floor(faker.number.float({ min: 0, max: 0.999999 }) * arr.length)]; }
+function pick<T>(arr: T[]): T { return arr[Math.floor(faker.number.float({ min: 0, max: 0.999999 }) * arr.length)]!; }
 
 function generatePhone(): string {
   const mid = faker.number.int({ min: 600, max: 699 });
@@ -66,7 +66,7 @@ async function batchInsert(db: Db, sql: string, rows: unknown[][], batchSize: nu
   let inserted = 0;
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
-    const cols = batch[0].length;
+    const cols = batch[0]!.length;
     const values: string[] = [];
     const params: unknown[] = [];
     batch.forEach((row, ri) => {
@@ -216,12 +216,12 @@ async function main(): Promise<void> {
     for (let i = 0; i < STUDENT_COUNT; i++) {
       const level = Math.floor(i / (STUDENT_COUNT / totalLevels));
       const completionLevel = Math.min(level, requiredSteps.length);
-      const { id: studentId, displayName: studentName, createdAt } = studentMeta[i];
+      const { id: studentId, displayName: studentName, createdAt } = studentMeta[i]!;
 
       let cursor = new Date(createdAt.getTime());
 
       for (let s = 0; s < completionLevel; s++) {
-        const step = requiredSteps[s];
+        const step = requiredSteps[s]!;
         const status = faker.number.float() < 0.9 ? 'completed' : 'waived';
         const completedBy = faker.number.float() < 0.7 ? 'integration' : 'manual';
         const daysOffset = faker.number.int({ min: 1, max: 3 });
@@ -308,7 +308,7 @@ async function main(): Promise<void> {
 
     // Extra tag-update entries (~200)
     for (let i = 0; i < 200; i++) {
-      const student = studentMeta[faker.number.int({ min: 0, max: STUDENT_COUNT - 1 })];
+      const student = studentMeta[faker.number.int({ min: 0, max: STUDENT_COUNT - 1 })]!;
       const tagArr = pick(TAG_POOL);
       const details = JSON.stringify({
         tags: tagArr,
@@ -326,7 +326,7 @@ async function main(): Promise<void> {
 
     // Extra profile-sync entries (~200)
     for (let i = 0; i < 200; i++) {
-      const student = studentMeta[faker.number.int({ min: 0, max: STUDENT_COUNT - 1 })];
+      const student = studentMeta[faker.number.int({ min: 0, max: STUDENT_COUNT - 1 })]!;
       const details = JSON.stringify({
         studentName: student.displayName,
         result: 'synced',

@@ -11,7 +11,8 @@
     "start": "cd server && npm start",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
     "import:fall-2026-checklist": "cd server && npm run import:fall-2026-checklist",
-    "seed": "cd server && npx tsx db/seed.ts"
+    "seed": "cd server && npx tsx db/seed.ts",
+    "type-check": "cd server && npx tsc --noEmit && cd ../client && npx tsc --noEmit"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

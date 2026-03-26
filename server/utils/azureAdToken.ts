@@ -61,7 +61,7 @@ function jwkToPem(jwk: JwkKey): string | Buffer {
 export async function verifyAzureAdToken(idToken: string): Promise<{ oid: string; email: string | undefined; name: string | undefined }> {
   // Decode header to get kid
   const header = JSON.parse(
-    Buffer.from(idToken.split('.')[0], 'base64url').toString()
+    Buffer.from(idToken.split('.')[0]!, 'base64url').toString()
   ) as { kid: string };
 
   const jwk = await getSigningKey(header.kid);

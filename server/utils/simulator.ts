@@ -46,11 +46,11 @@ function pickWeighted(items: WeightedAction[]): string {
     roll -= item.weight;
     if (roll <= 0) return item.action;
   }
-  return items[items.length - 1].action;
+  return items[items.length - 1]!.action;
 }
 
 function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
 async function tick(db: Db): Promise<void> {
@@ -108,7 +108,7 @@ async function tick(db: Db): Promise<void> {
     case 'complete': {
       // First required step NOT in progress (by sort_order)
       if (notCompletedRequired.length === 0) return;
-      targetStep = notCompletedRequired[0];
+      targetStep = notCompletedRequired[0]!;
       status = 'completed';
       completedBy = actor.type === 'integration' ? 'integration' : 'manual';
       auditAction = actor.type === 'integration' ? 'integration_complete' : 'complete';
@@ -118,7 +118,7 @@ async function tick(db: Db): Promise<void> {
     case 'undo': {
       // Last completed required step (highest sort_order)
       if (completedRequired.length === 0) return;
-      targetStep = completedRequired.sort((a, b) => b.sort_order - a.sort_order)[0];
+      targetStep = completedRequired.sort((a, b) => b.sort_order - a.sort_order)[0]!;
       status = 'not_completed';
       completedBy = actor.type === 'integration' ? 'integration' : 'manual';
       auditAction = actor.type === 'integration' ? 'integration_uncomplete' : 'uncomplete';

@@ -1289,11 +1289,11 @@ router.get('/analytics/completion-velocity', async (req: Request, res: Response,
 
     for (const student of students) {
       const days = parseInt(student.days_elapsed) || 0;
-      if (days <= 3) buckets['1-3 days']++;
-      else if (days <= 7) buckets['4-7 days']++;
-      else if (days <= 14) buckets['1-2 weeks']++;
-      else if (days <= 28) buckets['2-4 weeks']++;
-      else buckets['4+ weeks']++;
+      if (days <= 3) buckets['1-3 days']!++;
+      else if (days <= 7) buckets['4-7 days']!++;
+      else if (days <= 14) buckets['1-2 weeks']!++;
+      else if (days <= 28) buckets['2-4 weeks']!++;
+      else buckets['4+ weeks']!++;
     }
 
     res.json(Object.entries(buckets).map(([bucket, count]) => ({ bucket, student_count: count })));

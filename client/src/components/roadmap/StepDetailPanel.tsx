@@ -44,7 +44,7 @@ export default function StepDetailPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const links: LinkItem[] = step.links ? (typeof step.links === 'string' ? JSON.parse(step.links) : step.links) : [];
   const isHtmlContent = step.guide_content && /<[a-z][\s\S]*>/i.test(step.guide_content);
-  const statusConfig = STATUS_LABELS[step.status] || STATUS_LABELS.not_started;
+  const statusConfig = STATUS_LABELS[step.status] ?? STATUS_LABELS.not_started!;
 
   // Trap focus and handle escape
   useEffect(() => {
@@ -327,12 +327,12 @@ export default function StepDetailPanel({
           {/* Primary action for in-progress */}
           {step.status === 'in_progress' && !isHtmlContent && links.length > 0 && (
             <a
-              href={links[0].url}
+              href={links[0]!.url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider text-sm px-6 py-3.5 rounded-xl shadow transition-colors mb-3"
             >
-              {links[0].label || 'Get Started'}
+              {links[0]!.label || 'Get Started'}
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

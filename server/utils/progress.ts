@@ -38,7 +38,7 @@ export async function resolveStudentByStudentIdNumber(db: Db, studentIdNumber: u
     return { errorCode: 'duplicate_student_id_number', error: 'Student ID # is not unique' };
   }
 
-  return { student: rows[0], studentIdNumber: normalized };
+  return { student: rows[0]!, studentIdNumber: normalized };
 }
 
 export async function resolveStepForStudentByKey(

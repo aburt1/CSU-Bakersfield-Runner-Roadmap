@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "allowJs": true,
+    "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "outDir": "./dist",
     "rootDir": ".",
@@ -12,6 +12,6 @@
     "resolveJsonModule": true,
     "declaration": false
   },
-  "include": ["./**/*.ts", "./**/*.js"],
+  "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

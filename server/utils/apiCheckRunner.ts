@@ -67,7 +67,7 @@ export function extractFieldValue(obj: Record<string, unknown>, dotPath: string)
 function isPrivateIPv4(ip: string): boolean {
   if (ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('0.') || ip.startsWith('169.254.')) return true;
   if (ip.startsWith('172.')) {
-    const second = parseInt(ip.split('.')[1], 10);
+    const second = parseInt(ip.split('.')[1]!, 10);
     if (second >= 16 && second <= 31) return true;
   }
   if (ip.startsWith('192.168.')) return true;

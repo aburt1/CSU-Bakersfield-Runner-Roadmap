@@ -52,7 +52,7 @@ export default function ListView({ steps, completedDates, onSelectStep }: Props)
   return (
     <ul className="space-y-2" aria-label="Admissions steps list">
       {steps.map((step, index) => {
-        const config = STATUS_CONFIG[step.status] || STATUS_CONFIG.not_started;
+        const config = STATUS_CONFIG[step.status] ?? STATUS_CONFIG.not_started!;
 
         return (
           <li key={step.id}>

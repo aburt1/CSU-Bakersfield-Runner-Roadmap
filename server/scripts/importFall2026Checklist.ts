@@ -7,7 +7,7 @@ dotenv.config();
 function getArgValue(flag: string): string | null {
   const index = process.argv.indexOf(flag);
   if (index === -1 || index === process.argv.length - 1) return null;
-  return process.argv[index + 1];
+  return process.argv[index + 1] ?? null;
 }
 
 async function main(): Promise<void> {

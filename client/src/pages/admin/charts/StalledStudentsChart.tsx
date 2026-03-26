@@ -51,14 +51,14 @@ export default function StalledStudentsChart({ termId, api, onDrillDown }: Props
         const now = Date.now();
         for (const student of students) {
           if (!student.last_completion_date) {
-            buckets['3+ months']++;
+            buckets['3+ months']!++;
             continue;
           }
           const daysInactive = Math.floor((now - new Date(student.last_completion_date).getTime()) / (1000 * 60 * 60 * 24));
-          if (daysInactive <= 14) buckets['7-14 days']++;
-          else if (daysInactive <= 28) buckets['2-4 weeks']++;
-          else if (daysInactive <= 90) buckets['1-3 months']++;
-          else buckets['3+ months']++;
+          if (daysInactive <= 14) buckets['7-14 days']!++;
+          else if (daysInactive <= 28) buckets['2-4 weeks']!++;
+          else if (daysInactive <= 90) buckets['1-3 months']!++;
+          else buckets['3+ months']!++;
         }
 
         setData(Object.entries(buckets).map(([bucket, count]) => ({ bucket, student_count: count })));

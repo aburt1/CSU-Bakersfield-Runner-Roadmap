@@ -173,7 +173,7 @@ export default function ApiCheckConfig({ stepId, api }: Props) {
   const removeHeader = (idx: number) => setHeaders(headers.filter((_, i) => i !== idx));
   const updateHeader = (idx: number, prop: keyof HeaderEntry, value: string) => {
     const updated = [...headers];
-    updated[idx] = { ...updated[idx], [prop]: value };
+    updated[idx] = { ...updated[idx]!, [prop]: value };
     setHeaders(updated);
   };
 
