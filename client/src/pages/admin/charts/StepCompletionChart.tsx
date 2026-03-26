@@ -27,7 +27,7 @@ export default function StepCompletionChart({ data, onDrillDown }: Props) {
 
   const chartData = data.steps.map((s) => ({
     id: s.id,
-    name: s.title.length > 20 ? s.title.slice(0, 18) + '...' : s.title,
+    name: s.title.length > 28 ? s.title.slice(0, 26) + '...' : s.title,
     fullTitle: s.title,
     pct: data.totalStudents > 0 ? Math.round((s.completed_count / data.totalStudents) * 100) : 0,
     count: s.completed_count,
@@ -35,12 +35,12 @@ export default function StepCompletionChart({ data, onDrillDown }: Props) {
   }));
 
   return (
-    <div className="h-72">
+    <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
           <XAxis type="number" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
-          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
+          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             cursor={TOOLTIP_CURSOR}

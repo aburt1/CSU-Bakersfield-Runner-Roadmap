@@ -47,14 +47,21 @@ export default function SummaryStats({ api, termId }: Props) {
     return card.color;
   };
 
+  const cardEl = (card: CardDef) => (
+    <div key={card.label} className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-4 text-center">
+      <p className={`font-display text-2xl font-bold ${getColor(card)}`}>{card.value}</p>
+      <p className="font-body text-xs text-csub-gray mt-1 uppercase tracking-wide">{card.label}</p>
+    </div>
+  );
+
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6">
-      {cards.map((card) => (
-        <div key={card.label} className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-4 text-center">
-          <p className={`font-display text-2xl font-bold ${getColor(card)}`}>{card.value}</p>
-          <p className="font-body text-xs text-csub-gray mt-1 uppercase tracking-wide">{card.label}</p>
-        </div>
-      ))}
+    <div className="grid grid-cols-3 gap-4 md:grid-cols-[1fr_2fr] md:gap-6 mb-6">
+      {/* Left column: first stat — aligns with student list */}
+      {cardEl(cards[0]!)}
+      {/* Right column: remaining stats — aligns with detail panel */}
+      <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-4 md:gap-6">
+        {cards.slice(1).map((card) => cardEl(card))}
+      </div>
     </div>
   );
 }

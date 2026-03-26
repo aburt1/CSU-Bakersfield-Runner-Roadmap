@@ -73,7 +73,7 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
           value={loginName}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginName(e.target.value)}
           placeholder="Jane Doe"
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
+          className="w-full px-3 py-3 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
         />
       </div>
       <div className="flex-1 min-w-[160px]">
@@ -85,13 +85,13 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
           value={loginEmail}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginEmail(e.target.value)}
           placeholder="jdoe@csub.edu"
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
+          className="w-full px-3 py-3 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent"
         />
       </div>
       <button
         type="submit"
         disabled={loggingIn}
-        className="px-5 py-2 bg-csub-blue hover:bg-csub-blue-dark text-white rounded-lg font-body text-sm font-semibold transition-colors duration-200 disabled:opacity-50 whitespace-nowrap"
+        className="px-5 py-3 bg-csub-blue hover:bg-csub-blue-dark text-white rounded-lg font-body text-sm font-semibold transition-colors duration-200 disabled:opacity-50 whitespace-nowrap"
       >
         {loggingIn ? 'Signing in...' : 'Sign In'}
       </button>
@@ -101,11 +101,19 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
   const showDevLogin = import.meta.env.VITE_ALLOW_DEV_LOGIN !== 'false';
 
   const loginForm = (
-    <div className="ml-12 sm:ml-14 my-4 p-4 bg-csub-blue/5 rounded-xl border border-csub-blue/10">
-      <p className="font-body text-sm font-semibold text-csub-blue-dark mb-3">
-        {isAzureAdConfigured
-          ? 'Sign in with your CSUB account to track your progress.'
-          : 'Activated your CSUB account? Sign in to track your progress.'}
+    <div className="p-5 sm:p-6 bg-white rounded-xl border-2 border-csub-blue/20 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <svg className="w-5 h-5 text-csub-blue flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+        </svg>
+        <p className="font-display text-sm font-bold uppercase tracking-wider text-csub-blue-dark">
+          {isAzureAdConfigured
+            ? 'Sign in to track your progress'
+            : 'Activated your account? Sign in below'}
+        </p>
+      </div>
+      <p className="font-body text-xs text-csub-gray mb-4">
+        Once you've completed the steps above, sign in to unlock your full admissions checklist.
       </p>
 
       {/* SSO Button — only when Azure AD is configured */}
@@ -162,14 +170,14 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
       <header className="bg-csub-blue-dark text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 text-center">
           <p className="font-body text-csub-gold text-sm font-semibold tracking-wide mb-2">
-            Admissions Checklist
+            Welcome, Future Roadrunner!
           </p>
           <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold uppercase tracking-wide">
             Road to Becoming a{' '}
             <span className="text-csub-gold">Roadrunner</span>
           </h1>
           <p className="font-body text-white/70 text-sm sm:text-base mt-3 max-w-lg mx-auto">
-            Follow these steps to complete your admissions journey at CSUB. Start with the first steps below.
+            Complete the first steps below to activate your account, then sign in to track your full admissions journey.
           </p>
         </div>
       </header>
@@ -189,42 +197,65 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
           </section>
         ) : (
           <>
-            {/* Continuous timeline */}
-            <section className="mt-8">
-              <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wider mb-4">
-                Your Admissions Steps
-              </h2>
+            {/* Phase 1: Get Started */}
+            <section className="mt-8" aria-label="Get started steps">
+              <div className="flex items-center gap-3 mb-1">
+                <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wider">
+                  Get Started
+                </h2>
+                <span className="font-body text-xs font-semibold text-csub-blue bg-csub-blue/10 rounded-full px-2.5 py-0.5">
+                  {publicSteps.length} {publicSteps.length === 1 ? 'step' : 'steps'}
+                </span>
+              </div>
+              <p className="font-body text-sm text-csub-gray mb-4">
+                Complete these steps to activate your CSUB account.
+              </p>
 
               <ol className="relative" role="list">
                 {/* Timeline spine */}
                 <div
-                  className="absolute left-5 sm:left-6 top-4 bottom-4 w-0.5 bg-gray-200"
+                  className="absolute left-5 sm:left-6 top-4 bottom-4 w-0.5 bg-csub-blue/20"
                   aria-hidden="true"
                 />
 
-                {/* Public steps — shown as not_started */}
+                {/* Public steps — shown as preview */}
                 {publicSteps.map((step, i) => (
                   <TimelineStep
                     key={step.id}
                     step={{ ...step, status: 'preview' } as StepWithStatus}
                     index={i}
-                    isLast={false}
+                    isLast={i === publicSteps.length - 1}
                     onSelect={() => setSelectedStep(step)}
                   />
                 ))}
               </ol>
+            </section>
 
-              {/* Inline login bar — between public and locked */}
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-              >
-                {loginForm}
-              </motion.div>
+            {/* Phase 2: Sign-in milestone */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              className="my-6"
+            >
+              {loginForm}
+            </motion.div>
 
-              {/* Locked steps — shown as locked with fade */}
-              {lockedSteps.length > 0 && (
+            {/* Phase 3: What's ahead preview */}
+            {lockedSteps.length > 0 && (
+              <section aria-label="Upcoming steps preview">
+                <div className="flex items-center gap-3 mb-1">
+                  <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wider">
+                    What's Ahead
+                  </h2>
+                  <span className="font-body text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2.5 py-0.5">
+                    {lockedSteps.length} more {lockedSteps.length === 1 ? 'step' : 'steps'}
+                  </span>
+                </div>
+                <p className="font-body text-sm text-csub-gray mb-4">
+                  Sign in to unlock these steps and track your progress.
+                </p>
+
                 <div className="relative">
                   <ol className="relative" role="list">
                     <div
@@ -238,14 +269,15 @@ export default function PublicRoadmapPreview({ onLogin }: Props): React.ReactEle
                         index={publicSteps.length + i}
                         isLast={i === lockedSteps.length - 1}
                         onSelect={() => {}}
+                        compact
                       />
                     ))}
                   </ol>
                   {/* Fade-out gradient */}
-                  <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
                 </div>
-              )}
-            </section>
+              </section>
+            )}
           </>
         )}
 

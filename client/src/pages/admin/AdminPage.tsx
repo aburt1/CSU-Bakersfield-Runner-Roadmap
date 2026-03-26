@@ -161,7 +161,7 @@ export default function AdminPage() {
           {/* Top row: title + user actions */}
           <div className="flex items-center justify-between">
             <h1 className="font-display text-lg font-bold uppercase tracking-wide">
-              CSUB Admissions Admin
+              Rowdy Rundown
             </h1>
             <div className="flex items-center gap-3 text-sm font-body">
               {showHeaderTermSelector && (

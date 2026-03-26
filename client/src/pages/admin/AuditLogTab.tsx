@@ -236,7 +236,10 @@ export default function AuditLogTab({ api }: Props) {
             <label className="block font-body text-xs font-semibold text-csub-blue-dark mb-1">Entity</label>
             <select
               value={entityFilter}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setEntityFilter(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                setEntityFilter(e.target.value);
+                fetchLogs({ entityType: e.target.value }, 0);
+              }}
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent bg-white"
             >
               {ENTITY_OPTIONS.map((option) => (
@@ -249,7 +252,10 @@ export default function AuditLogTab({ api }: Props) {
             <label className="block font-body text-xs font-semibold text-csub-blue-dark mb-1">Action</label>
             <select
               value={actionFilter}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setActionFilter(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                setActionFilter(e.target.value);
+                fetchLogs({ action: e.target.value }, 0);
+              }}
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue focus:border-transparent bg-white"
             >
               {ACTION_OPTIONS.map((option) => (
@@ -272,12 +278,14 @@ export default function AuditLogTab({ api }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleApplyFilters}
-            className="bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow transition-colors text-sm"
-          >
-            Apply Filters
-          </button>
+          {(query.trim() || actorFilter.trim()) && (
+            <button
+              onClick={handleApplyFilters}
+              className="bg-csub-blue hover:bg-csub-blue-dark text-white font-display font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow transition-colors text-sm"
+            >
+              Apply
+            </button>
+          )}
           {selectedStudentId && (
             <button
               onClick={clearStudent}

@@ -167,7 +167,7 @@ export default function StudentsTab({ api, steps, role = 'viewer', termId }: Pro
           </div>
 
           {/* Student list */}
-          <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             {!loading && students.length === 0 && <p className="font-body text-sm text-csub-gray text-center py-6">{search ? 'No students found.' : 'No students in this term yet.'}</p>}
             {loading && students.length === 0 && <p className="font-body text-sm text-csub-gray text-center py-6">Loading students...</p>}
             {students.map((s) => {
@@ -217,7 +217,7 @@ export default function StudentsTab({ api, steps, role = 'viewer', termId }: Pro
         </div>
 
         {/* Right: Student detail */}
-        <div>
+        <div className="md:sticky md:top-4 md:self-start">
           <StudentDetail student={selectedStudent} steps={steps} api={api} role={role} onProgressChange={refreshStudents} />
         </div>
       </div>

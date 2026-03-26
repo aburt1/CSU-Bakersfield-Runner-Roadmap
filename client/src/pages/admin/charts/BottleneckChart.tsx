@@ -28,7 +28,7 @@ export default function BottleneckChart({ data, onDrillDown }: Props) {
 
   const chartData = data.steps.map((s) => ({
     id: s.id,
-    name: s.title.length > 25 ? s.title.slice(0, 23) + '...' : s.title,
+    name: s.title.length > 30 ? s.title.slice(0, 28) + '...' : s.title,
     fullTitle: s.title,
     pct: s.completion_pct,
     count: s.completed_count,
@@ -36,7 +36,7 @@ export default function BottleneckChart({ data, onDrillDown }: Props) {
   }));
 
   return (
-    <div className="h-56">
+    <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
