@@ -45,12 +45,14 @@ Add `"seed": "node server/db/seed.js"` to package.json scripts.
 
 ### Audit Log Generation
 - One audit entry per progress record (each completion/waive gets a log entry)
-- Timestamps match the progress `completed_at`
-- `changed_by` distribution: 70% `system`/integration names, 20% student self-service (student display name), 10% admin names (e.g., "Admin", "Maria Santos", "James Chen")
+- **Historical timestamps:** The seed script inserts directly into `audit_log` with explicit `created_at` values (bypassing `logAudit()` which only supports `NOW()`). This produces a realistic timeline spanning from earliest student enrollment through today.
+- `changed_by` distribution: 70% `system`/integration names (e.g., `"PeopleSoft Dev"`), 20% student self-service (student display name), 10% admin names (e.g., `"Admin"`, `"Maria Santos"`, `"James Chen"`)
 - Additional audit entries: ~200 tag changes and profile sync events spread across the timeline
 - Entity types used: `student_progress`, `student_tags`, `student_profile`
-- Actions used: `complete`, `waive`, `student_optional_complete`, `integration_complete`, `integration_waive`, `tags_updated`, `profile_synced`
+- Actions used (matching exact codebase strings): `complete`, `waive`, `uncomplete`, `student_optional_complete`, `student_optional_uncomplete`, `integration_complete`, `integration_waive`, `integration_uncomplete`, `tags_update`, `student_profile_update`
 - Estimated total: 8,000–10,000 audit entries spanning from earliest student `created_at` through today
+
+**Note on `completed_by` vs `changed_by`:** These are distinct fields on different tables. `completed_by` on `student_progress` is a status flag (`'manual'` or `'integration'`). `changed_by` on `audit_log` is the human-readable actor name. The seed script sets both appropriately.
 
 ### Performance
 - Uses batch INSERT statements (100 rows per batch) for students, progress, and audit entries
@@ -59,7 +61,7 @@ Add `"seed": "node server/db/seed.js"` to package.json scripts.
 
 ### Safety
 - Checks if >100 students already exist; prompts confirmation unless `--force`
-- `--clean` flag: deletes students with `id LIKE 'seed-demo-%'` and their associated progress/audit entries before inserting
+- `--clean` flag: deletes in FK-safe order: (1) `student_progress` where `student_id LIKE 'seed-demo-%'`, (2) `audit_log` where `entity_id LIKE 'seed-demo-%'`, (3) `students` where `id LIKE 'seed-demo-%'`. This order avoids foreign key violations since `student_progress` has an FK to `students` without `ON DELETE CASCADE`.
 - Never deletes non-seed data (the original 50 `seed-student-*` entries or real users)
 
 ## Live Simulator (`server/utils/simulator.js`)
@@ -78,8 +80,9 @@ Background loop running every 30–60 seconds (random interval per tick). Each t
 
 ### Implementation
 - Uses existing `applyStudentProgressChange()` from `server/utils/progress.js`
-- Uses existing `logAudit()` from `server/utils/audit.js` (passes a mock `req` object with the simulated actor)
-- `changed_by` rotates between: `"PeopleSoft Sync"`, `"Admissions Bot"`, `"CRM Import"`, random admin names, and student self-service (student's own name)
+- Uses existing `logAudit()` from `server/utils/audit.js` (passes a mock `req` object with the simulated actor). Since the simulator runs in real-time, `NOW()` timestamps from `logAudit()` are correct.
+- Must check for `result !== 'noop'` before calling `logAudit()` to avoid phantom audit entries (matching the pattern used in existing route handlers)
+- Audit `changed_by` rotates between: `"PeopleSoft Sync"`, `"Admissions Bot"`, `"CRM Import"`, random admin names, and student self-service (student's own name). The `completed_by` field on progress is set to `'integration'` for system actors or `'manual'` for admin/student actors.
 - Console output per action: `[simulator] Completed "Submit Intent to Enroll" for Sofia Garcia`
 
 ### Activation
