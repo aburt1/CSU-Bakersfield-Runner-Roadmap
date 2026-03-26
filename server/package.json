@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@azure/msal-node": "^5.0.6",
+    "@faker-js/faker": "^10.4.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -18,8 +19,5 @@
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.13.0",
     "uuid": "^11.0.5"
-  },
-  "devDependencies": {
-    "@faker-js/faker": "^10.4.0"
   }
 }

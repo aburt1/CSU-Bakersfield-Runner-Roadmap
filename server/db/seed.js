@@ -85,11 +85,22 @@ async function main() {
   const args = process.argv.slice(2);
   const force = args.includes('--force');
   const clean = args.includes('--clean');
+  const once = args.includes('--once');
 
   const db = createDb();
   const start = Date.now();
 
   try {
+    // ── Once mode — skip if seed data already exists ─────────────────
+    if (once) {
+      const { count } = await db.queryOne("SELECT COUNT(*)::int AS count FROM students WHERE id LIKE 'seed-demo-%'");
+      if (count > 0) {
+        console.log(`Seed data already present (${count} seed students). Skipping.`);
+        await db.end();
+        return;
+      }
+    }
+
     // ── Clean mode ───────────────────────────────────────────────────
     if (clean) {
       console.log('Cleaning existing seed-demo data...');

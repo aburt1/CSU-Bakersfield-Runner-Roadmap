@@ -107,8 +107,8 @@ async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`CSUB Admissions API running on port ${PORT}`);
 
-      // Start live activity simulator in dev mode
-      if (process.env.NODE_ENV !== 'production' && !process.env.DISABLE_SIMULATOR) {
+      // Start live activity simulator (disable with DISABLE_SIMULATOR=1)
+      if (!process.env.DISABLE_SIMULATOR) {
         import('./utils/simulator.js').then(({ startSimulator }) => startSimulator(db));
       }
     });

@@ -24,4 +24,5 @@ RUN cd server && npm ci --omit=dev
 
 EXPOSE 3001
 
-CMD ["node", "server/index.js"]
+# Seed demo data on first start (idempotent — ON CONFLICT DO NOTHING), then start server
+CMD ["sh", "-c", "cd server && node db/seed.js --force --once && cd /app && node server/index.js"]
