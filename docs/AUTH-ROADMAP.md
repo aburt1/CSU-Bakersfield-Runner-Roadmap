@@ -9,7 +9,7 @@ The application has two separate authentication systems:
 - **How it works:** Students enter their name and email. The server creates or finds a student record and returns a JWT token.
 - **Token storage:** `sessionStorage` (cleared on tab close)
 - **Token lifetime:** 8 hours
-- **Where:** `client/src/auth/AuthProvider.jsx`, `server/routes/auth.js`
+- **Where:** `client/src/auth/AuthProvider.tsx`, `server/routes/auth.ts`
 - **Note:** Azure AD SSO is also implemented and available — disabled by default (see below)
 
 ### Admin Authentication
@@ -22,12 +22,12 @@ The application has two separate authentication systems:
 - **Token storage:** `sessionStorage`
 - **Token lifetime:** 8 hours
 - **RBAC roles:** `viewer`, `admissions`, `admissions_editor`, `sysadmin`
-- **Where:** `client/src/pages/admin/AdminLogin.jsx`, `client/src/pages/admin/AdminLocalLogin.jsx`, `server/routes/adminAuth.js`
+- **Where:** `client/src/pages/admin/AdminLogin.tsx`, `client/src/pages/admin/AdminLocalLogin.tsx`, `server/routes/adminAuth.ts`
 
 ### Integration Authentication
 - **Method:** API key (`X-Integration-Key` header or `Bearer` token)
 - **How it works:** External systems authenticate with a bcrypt-verified integration key
-- **Where:** `server/middleware/integrationAuth.js`
+- **Where:** `server/middleware/integrationAuth.ts`
 
 ---
 
@@ -36,13 +36,13 @@ The application has two separate authentication systems:
 Azure AD SSO is fully implemented but only activates when `AZURE_AD_CLIENT_ID` and `AZURE_AD_TENANT_ID` are set in the environment. When those variables are absent, the app falls back to dev login as before.
 
 ### Client
-- **MSAL config and instance:** `client/src/auth/msalConfig.js` — exports the MSAL `PublicClientApplication` instance and configuration
-- **Auth flow:** `AuthProvider.jsx` attempts a popup login via MSAL and falls back to redirect if popups are blocked
-- **UI entry point:** SSO button rendered in `PublicRoadmapPreview.jsx` when `VITE_AZURE_AD_CLIENT_ID` is set
+- **MSAL config and instance:** `client/src/auth/msalConfig.ts` — exports the MSAL `PublicClientApplication` instance and configuration
+- **Auth flow:** `AuthProvider.tsx` attempts a popup login via MSAL and falls back to redirect if popups are blocked
+- **UI entry point:** SSO button rendered in `PublicRoadmapPreview.tsx` when `VITE_AZURE_AD_CLIENT_ID` is set
 
 ### Server
 - **Endpoint:** `POST /api/auth/sso` — accepts a Microsoft ID token from the client
-- **Validation:** `server/utils/azureAdToken.js` validates the token signature via JWKS (Microsoft's public key endpoint) and verifies audience/issuer claims
+- **Validation:** `server/utils/azureAdToken.ts` validates the token signature via JWKS (Microsoft's public key endpoint) and verifies audience/issuer claims
 - **Student mapping:** Validated Azure AD claims are mapped to student records using the `azure_id` column in the students table
 
 ### Enabling SSO

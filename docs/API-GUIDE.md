@@ -563,7 +563,7 @@ curl -H "Authorization: Bearer <student-jwt>" \
 
 Status values: `"running"`, `"complete"`, `"no_run"` (no recent run).
 
-**Polling pattern (JavaScript):**
+**Polling pattern (TypeScript):**
 
 ```javascript
 async function runAndPoll(token) {

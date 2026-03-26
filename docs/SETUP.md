@@ -118,7 +118,7 @@ CSUB-admissions/
 │   ├── middleware/         # Auth middleware (student, admin, integration)
 │   ├── routes/            # API route handlers
 │   ├── utils/             # Shared utilities
-│   └── index.js           # Entry point
+│   └── index.ts           # Entry point
 │
 ├── docs/                  # Documentation
 │   ├── API-GUIDE.md       # Integration API reference

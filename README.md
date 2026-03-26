@@ -2,6 +2,7 @@
 
 An interactive student onboarding application for California State University, Bakersfield. Guides newly admitted students through every step of the admissions process — from acceptance to their first day of classes.
 
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
@@ -55,8 +56,8 @@ Admissions staff manage students, steps, analytics, audit logs, terms, and user 
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 18, Vite 6, Tailwind CSS 3, Framer Motion, Recharts, Tiptap, DOMPurify |
-| **Backend** | Node.js 20, Express 4, PostgreSQL 16 |
+| **Frontend** | React 18, TypeScript, Vite 6, Tailwind CSS 3, Framer Motion, Recharts, Tiptap, DOMPurify |
+| **Backend** | Node.js 20, Express 4, TypeScript, PostgreSQL 16 |
 | **Auth** | JWT sessions, bcrypt password hashing (Azure AD SSO planned — see [Auth Roadmap](docs/AUTH-ROADMAP.md)) |
 | **Security** | Helmet, CORS, express-rate-limit, AES-256-GCM credential encryption |
 | **Deployment** | Docker containerized single-process server (serves API + static frontend) |
@@ -145,17 +146,17 @@ CSUB-admissions/
 │   │   ├── components/         # Shared UI (Header, StepCard, roadmap/)
 │   │   ├── hooks/              # useProgress custom hook
 │   │   └── pages/
-│   │       ├── RoadmapPage.jsx # Main student view
+│   │       ├── RoadmapPage.tsx # Main student view
 │   │       └── admin/          # Admin dashboard (5 tabs)
 │   ├── tailwind.config.js
 │   └── vite.config.js
 │
 ├── server/                     # Express API
-│   ├── db/init.js              # PostgreSQL schema, migrations, seed data
+│   ├── db/init.ts              # PostgreSQL schema, migrations, seed data
 │   ├── middleware/              # auth, adminAuth, integrationAuth, requireRole
 │   ├── routes/                 # auth, steps, admin, adminAuth, integrations, apiChecks
 │   ├── utils/                  # audit, progress, tags, step keys, encryption, apiCheckRunner
-│   └── index.js                # App entry point
+│   └── index.ts                # App entry point
 │
 ├── docs/                       # Documentation
 │   ├── API-GUIDE.md            # Integration API guide
