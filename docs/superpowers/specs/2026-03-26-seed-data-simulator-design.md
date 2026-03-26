@@ -22,15 +22,35 @@ Add `"seed": "node server/db/seed.js"` to package.json scripts.
 
 ### Student Generation (1,234 students)
 - **Library:** `@faker-js/faker` with fixed seed for reproducible output
-- **Names:** Diverse names reflecting Central Valley demographics (locale mixing)
+- **Names:** Diverse names reflecting Central Valley demographics (locale mixing — English, Spanish, Vietnamese, South Asian names common in Kern County)
 - **Email:** `{first}{last_initial}@csub.edu` with numeric dedup suffix for collisions
 - **ID format:** `seed-demo-{padded 4-digit number}` (0000–1233)
-- **Emplid:** `002000000` through `002001233`
-- **Profile fields:**
-  - Applicant type: Freshman 50%, Transfer 35%, Readmit 15%
-  - Major: random from existing 10 majors (Business, CS, Psychology, Nursing, Engineering, Biology, Criminal Justice, Kinesiology, Sociology, Liberal Studies)
+- **Emplid:** 9-digit student IDs matching CSUB format: `100200000` through `100201233`
+- **Profile fields (sourced from csub.edu):**
+  - Applicant type: First-Time Freshman 50%, Transfer 35%, Readmit 15%
+  - Major: random from actual CSUB undergraduate programs:
+    - Business Administration (BS) — various concentrations (Accounting, Finance, Management, Marketing, etc.)
+    - Computer Science (BS)
+    - Criminal Justice (BA)
+    - Psychology (BA)
+    - Nursing (BSN)
+    - Biology (BS)
+    - Kinesiology (BS)
+    - Liberal Studies (BA)
+    - Sociology (BA)
+    - Engineering (BS)
+    - Child, Adolescent, and Family Studies (BA)
+    - Communications (BA)
+    - History (BA)
+    - Public Health (BS)
+    - Mathematics (BS)
+    - English (BA)
+    - Political Science (BA)
+    - Chemistry (BS)
+    - Art (BA)
+    - Economics (BS)
   - Residency: 80% In-State, 20% Out-of-State
-  - Phone: random `(661) 6xx-xxxx` format
+  - Phone: random `(661) 6xx-xxxx` format (Bakersfield area code)
   - Preferred name: 15% of students get one
 - **Tags:** weighted random from existing pool (`first-gen`, `honors`, `eop`, `athlete`, `veteran`, combos, and none)
 - **`created_at`:** random date 30–60 days in the past
