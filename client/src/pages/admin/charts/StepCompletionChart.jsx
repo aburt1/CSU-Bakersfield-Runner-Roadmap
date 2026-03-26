@@ -1,4 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { CSUB_BLUE, CSUB_GOLD, AXIS_COLOR, AXIS_FONT_SIZE, GRID_COLOR, TOOLTIP_STYLE, TOOLTIP_CURSOR, BAR_RADIUS_HORIZONTAL } from './chartTheme';
 
 export default function StepCompletionChart({ data, onDrillDown }) {
   if (!data?.steps?.length) return <p className="font-body text-sm text-csub-gray text-center py-4">No data</p>;
@@ -16,16 +17,18 @@ export default function StepCompletionChart({ data, onDrillDown }) {
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
-          <YAxis type="category" dataKey="name" width={140} fontSize={11} tick={{ fill: '#001A70' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+          <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
+          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
           <Tooltip
-            formatter={(value, name, props) => [`${props.payload.count}/${props.payload.total} (${value}%)`, 'Completion']}
+            contentStyle={TOOLTIP_STYLE}
+            cursor={TOOLTIP_CURSOR}
+            formatter={(value, name, props) => [`${props.payload.count}/${props.payload.total} (${value}%)`, null]}
             labelFormatter={(label) => chartData.find(d => d.name === label)?.fullTitle || label}
           />
-          <Bar dataKey="pct" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'step_completed', filterValue: data.id })}>
+          <Bar dataKey="pct" radius={BAR_RADIUS_HORIZONTAL} cursor="pointer" onClick={(data) => onDrillDown?.({ filterType: 'step_completed', filterValue: data.id })}>
             {chartData.map((entry, i) => (
-              <Cell key={i} fill={entry.pct === 100 ? '#FFC72C' : '#003594'} />
+              <Cell key={i} fill={entry.pct === 100 ? CSUB_GOLD : CSUB_BLUE} />
             ))}
           </Bar>
         </BarChart>

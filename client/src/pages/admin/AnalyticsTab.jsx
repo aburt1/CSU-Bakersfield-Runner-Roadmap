@@ -100,10 +100,10 @@ export default function AnalyticsTab({ api, termId }) {
 
         {/* Bottlenecks */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-          <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-4">
+          <h3 className="font-display text-sm font-bold text-csub-blue-dark uppercase tracking-wide mb-1">
             Bottleneck Steps
           </h3>
-          <p className="font-body text-xs text-csub-gray mb-3">Steps with the lowest completion rates</p>
+          <p className="font-body text-xs text-csub-gray mb-4">Steps with the lowest completion rates — these may need attention or clearer instructions</p>
           <BottleneckChart data={bottlenecks} onDrillDown={setDrillDown} />
         </div>
       </div>

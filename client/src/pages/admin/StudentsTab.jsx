@@ -100,16 +100,19 @@ export default function StudentsTab({ api, steps, role = 'viewer', termId }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left: Student list */}
         <div>
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
-              Students
-            </h2>
-            {totalStudents > 0 && (
-              <span className="font-body text-xs text-csub-gray bg-gray-100 rounded-full px-2.5 py-0.5">
-                {totalStudents} total
-              </span>
-            )}
-            <div className="flex-1 h-px bg-gray-200" />
+          <div className="mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
+                Students
+              </h2>
+              {totalStudents > 0 && (
+                <span className="font-body text-xs text-csub-gray bg-gray-100 rounded-full px-2.5 py-0.5">
+                  {totalStudents} total
+                </span>
+              )}
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <p className="font-body text-xs text-csub-gray mt-1">Select a student to view their progress and manage step completions</p>
           </div>
 
           {/* Search bar */}

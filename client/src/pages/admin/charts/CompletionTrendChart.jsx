@@ -1,4 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { CSUB_BLUE, CSUB_GOLD, AXIS_COLOR, AXIS_FONT_SIZE, GRID_COLOR, TOOLTIP_STYLE, TOOLTIP_CURSOR } from './chartTheme';
 
 export default function CompletionTrendChart({ data, onDrillDown }) {
   if (!data?.length) return <p className="font-body text-sm text-csub-gray text-center py-4">No data</p>;
@@ -13,17 +14,21 @@ export default function CompletionTrendChart({ data, onDrillDown }) {
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ left: 0, right: 20, top: 5, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" fontSize={11} />
-          <YAxis fontSize={11} allowDecimals={false} />
-          <Tooltip />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+          <XAxis dataKey="date" tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} />
+          <YAxis tick={{ fontSize: AXIS_FONT_SIZE, fill: AXIS_COLOR }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            cursor={TOOLTIP_CURSOR}
+            formatter={(value) => [`${value} completions`, null]}
+          />
           <Line
             type="monotone"
             dataKey="completions"
-            stroke="#003594"
+            stroke={CSUB_BLUE}
             strokeWidth={2}
-            dot={{ fill: '#FFC72C', r: 4, cursor: 'pointer' }}
-            activeDot={{ r: 6, fill: '#FFC72C', cursor: 'pointer', onClick: (e, payload) => onDrillDown?.({ filterType: 'trend_date', filterValue: payload.payload.rawDate }) }}
+            dot={{ fill: CSUB_GOLD, r: 4, cursor: 'pointer' }}
+            activeDot={{ r: 6, fill: CSUB_GOLD, cursor: 'pointer', onClick: (e, payload) => onDrillDown?.({ filterType: 'trend_date', filterValue: payload.payload.rawDate }) }}
           />
         </LineChart>
       </ResponsiveContainer>

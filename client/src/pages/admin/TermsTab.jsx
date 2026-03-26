@@ -61,9 +61,12 @@ export default function TermsTab({ api, onTermsChange }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
-          Admission Terms
-        </h2>
+        <div>
+          <h2 className="font-display text-lg font-bold text-csub-blue-dark uppercase tracking-wide">
+            Admission Terms
+          </h2>
+          <p className="font-body text-xs text-csub-gray mt-1">Manage enrollment periods and their date ranges</p>
+        </div>
         {!showForm && (
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
