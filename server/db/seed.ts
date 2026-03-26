@@ -103,7 +103,6 @@ async function main(): Promise<void> {
       const row = await db.queryOne<{ count: number }>("SELECT COUNT(*)::int AS count FROM students WHERE id LIKE 'seed-demo-%'");
       if (row && row.count > 0) {
         console.log(`Seed data already present (${row.count} seed students). Skipping.`);
-        await db.end();
         return;
       }
     }
