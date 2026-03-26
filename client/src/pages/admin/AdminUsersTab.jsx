@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { ROLES, ROLE_OPTIONS, ROLE_COLORS_LIGHT } from './roleConfig';
-import { isAzureAdConfigured } from '../../auth/msalConfig';
 
 export default function AdminUsersTab({ api }) {
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ email: '', password: '', displayName: '', role: 'viewer' });
+  const [form, setForm] = useState({ email: '', displayName: '', role: 'viewer' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -17,7 +16,7 @@ export default function AdminUsersTab({ api }) {
   useEffect(() => { loadUsers(); }, [api]);
 
   const resetForm = () => {
-    setForm({ email: '', password: '', displayName: '', role: 'viewer' });
+    setForm({ email: '', displayName: '', role: 'viewer' });
     setShowForm(false);
     setEditingId(null);
     setError('');
@@ -29,11 +28,9 @@ export default function AdminUsersTab({ api }) {
     setSaving(true);
     try {
       if (editingId) {
-        const body = { displayName: form.displayName, role: form.role };
-        if (form.password) body.password = form.password;
-        await api.put(`/users/${editingId}`, body);
+        await api.put(`/users/${editingId}`, { displayName: form.displayName, role: form.role });
       } else {
-        await api.post('/users', form);
+        await api.post('/users', { email: form.email, displayName: form.displayName, role: form.role });
       }
       resetForm();
       loadUsers();
@@ -45,7 +42,7 @@ export default function AdminUsersTab({ api }) {
   };
 
   const startEdit = (user) => {
-    setForm({ email: user.email, password: '', displayName: user.display_name, role: user.role });
+    setForm({ email: user.email, displayName: user.display_name, role: user.role });
     setEditingId(user.id);
     setShowForm(true);
   };
@@ -104,16 +101,6 @@ export default function AdminUsersTab({ api }) {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue disabled:bg-gray-100"
             />
-            {!isAzureAdConfigured && (
-              <input
-                type="password"
-                required={!editingId}
-                placeholder={editingId ? 'New password (leave blank to keep)' : 'Password'}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="px-3 py-2 rounded-lg border border-gray-300 font-body text-sm focus:outline-none focus:ring-2 focus:ring-csub-blue"
-              />
-            )}
             <select
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}

@@ -97,7 +97,7 @@ export default function StudentsTab({ api, steps, role = 'viewer', termId }) {
     <div>
       <SummaryStats api={api} termId={termId} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6">
         {/* Left: Student list */}
         <div>
           <div className="mb-4">
