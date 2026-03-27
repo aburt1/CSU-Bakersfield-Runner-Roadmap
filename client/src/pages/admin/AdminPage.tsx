@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode, type ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, type ReactNode, type ChangeEvent } from 'react';
 import { isAzureAdConfigured } from '../../auth/msalConfig';
 import { useAdminApi } from './hooks/useAdminApi';
 import AdminLogin from './AdminLogin';
@@ -82,8 +82,25 @@ const TAB_ICONS: Record<string, ReactNode> = {
 };
 
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export default function AdminPage() {
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem('csub_admin_token'));
+  const [token, setToken] = useState<string | null>(() => {
+    const stored = sessionStorage.getItem('csub_admin_token');
+    if (stored && isTokenExpired(stored)) {
+      sessionStorage.removeItem('csub_admin_token');
+      sessionStorage.removeItem('csub_admin_user');
+      return null;
+    }
+    return stored;
+  });
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
     const stored = sessionStorage.getItem('csub_admin_user');
     return stored ? JSON.parse(stored) : null;
@@ -92,7 +109,15 @@ export default function AdminPage() {
   const [steps, setSteps] = useState<Step[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
-  const api = useAdminApi(token);
+
+  const handleAuthError = useCallback(() => {
+    sessionStorage.removeItem('csub_admin_token');
+    sessionStorage.removeItem('csub_admin_user');
+    setToken(null);
+    setAdminUser(null);
+  }, []);
+
+  const api = useAdminApi(token, handleAuthError);
 
   const handleTermsChange = (nextTerms: Term[], preferredTermId: number | null = selectedTermId) => {
     setTerms(nextTerms);
@@ -117,12 +142,7 @@ export default function AdminPage() {
     setAdminUser(user);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('csub_admin_token');
-    sessionStorage.removeItem('csub_admin_user');
-    setToken(null);
-    setAdminUser(null);
-  };
+  const handleLogout = handleAuthError;
 
   // Fetch terms on login
   useEffect(() => {

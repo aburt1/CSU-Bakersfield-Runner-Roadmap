@@ -17,7 +17,7 @@ export interface AdminApi {
   raw: (path: string, options?: Omit<RequestOptions, 'raw'>) => Promise<Response>;
 }
 
-export function useAdminApi(token: string | null): AdminApi {
+export function useAdminApi(token: string | null, onAuthError?: () => void): AdminApi {
   const request = useCallback(async <T = unknown>(path: string, options: RequestOptions = {}): Promise<T | Response> => {
     const { method = 'GET', body, raw: returnRaw, ...rest } = options;
     const headers: Record<string, string> = { 'Authorization': `Bearer ${token}`, ...rest.headers };
@@ -30,12 +30,16 @@ export function useAdminApi(token: string | null): AdminApi {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (returnRaw) return res;
+    if (res.status === 401) {
+      onAuthError?.();
+      throw new Error('Session expired');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Request failed' }));
       throw new Error(err.error || 'Request failed');
     }
     return res.json() as Promise<T>;
-  }, [token]);
+  }, [token, onAuthError]);
 
   const get = useCallback(<T = unknown>(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<T> => {
     if (params) {
