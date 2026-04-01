@@ -8,7 +8,11 @@ import rateLimit from 'express-rate-limit';
 import type { AdminUser } from '../types/models.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-to-a-secure-random-string';
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set. Server cannot start.');
+  process.exit(1);
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 
 interface AdminJwtPayload {
   adminId: number | string;
@@ -16,6 +20,14 @@ interface AdminJwtPayload {
   email: string;
   displayName: string;
 }
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again later.' },
+});
 
 const breakGlassLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -33,7 +45,7 @@ function constantTimeCompare(a: string, b: string): boolean {
 }
 
 // POST /api/admin/auth/login
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
@@ -60,7 +72,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       email: user.email,
       displayName: user.display_name,
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ type: 'admin', ...payload }, JWT_SECRET, { expiresIn: '8h' });
 
     res.json({
       token,
@@ -104,8 +116,8 @@ router.post('/change-password', adminAuth, async (req: Request, res: Response, n
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password required' });
     }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (newPassword.length < 12) {
+      return res.status(400).json({ error: 'Password must be at least 12 characters' });
     }
 
     const user = await req.db.queryOne<AdminUser>(
@@ -199,7 +211,7 @@ router.post('/sso', async (req: Request, res: Response, next: NextFunction) => {
       email: admin.email,
       displayName: name || admin.display_name,
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ type: 'admin', ...payload }, JWT_SECRET, { expiresIn: '8h' });
 
     res.json({
       token,
@@ -260,7 +272,7 @@ router.post('/local-login', breakGlassLimiter, async (req: Request, res: Respons
       email: 'break-glass',
       displayName: 'Break Glass Admin',
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ type: 'admin', ...payload }, JWT_SECRET, { expiresIn: '8h' });
 
     res.json({
       token,

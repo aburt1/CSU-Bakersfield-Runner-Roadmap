@@ -39,11 +39,24 @@ process.on('uncaughtException', (error) => {
 });
 
 // Security middleware
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
+
+const corsOrigin = process.env.CORS_ORIGIN
+  || (process.env.NODE_ENV === 'production' ? false : 'http://localhost:3000');
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production'
-    ? true  // allow same-origin in production (served from same Express server)
-    : 'http://localhost:3000'),
+  origin: corsOrigin,
   credentials: true,
 }));
 
@@ -78,7 +91,9 @@ async function startServer(): Promise<void> {
     app.use('/api/integrations/v1', integrationsRouter);
     app.use('/api/roadmap', studentApiChecksRouter);
     app.use('/api/admin', apiChecksRouter);
-    app.use('/api/mock', mockApiChecksRouter);
+    if (process.env.NODE_ENV !== 'production') {
+      app.use('/api/mock', mockApiChecksRouter);
+    }
 
     // Health check
     app.get('/api/health', (_req: Request, res: Response) => {

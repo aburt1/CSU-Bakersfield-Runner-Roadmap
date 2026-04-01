@@ -668,8 +668,19 @@ router.get('/export/progress', async (req: Request, res: Response, next: NextFun
     const steps = await req.db.queryAll<{ id: number; title: string }>(`SELECT id, title FROM steps ${stepFilter} ORDER BY sort_order`, params);
     const students = await req.db.queryAll<{ id: string; display_name: string; email: string }>(`SELECT id, display_name, email FROM students ${studentFilter} ORDER BY display_name`, params);
 
-    // Get all progress
-    const allProgress = await req.db.queryAll<{ student_id: string; step_id: number; status: string }>('SELECT student_id, step_id, status FROM student_progress');
+    // Get progress scoped to the relevant students and steps
+    const studentIds = students.map(s => s.id);
+    const stepIds = steps.map(s => s.id);
+    let allProgress: { student_id: string; step_id: number; status: string }[] = [];
+    if (studentIds.length > 0 && stepIds.length > 0) {
+      const studentPlaceholders = studentIds.map((_, i) => `$${i + 1}`).join(',');
+      const stepPlaceholders = stepIds.map((_, i) => `$${studentIds.length + i + 1}`).join(',');
+      allProgress = await req.db.queryAll<{ student_id: string; step_id: number; status: string }>(
+        `SELECT student_id, step_id, status FROM student_progress
+         WHERE student_id IN (${studentPlaceholders}) AND step_id IN (${stepPlaceholders})`,
+        [...studentIds, ...stepIds]
+      );
+    }
     const progressMap = new Map<string, string>();
     for (const p of allProgress) {
       const key = `${p.student_id}:${p.step_id}`;
@@ -690,8 +701,17 @@ router.get('/export/progress', async (req: Request, res: Response, next: NextFun
       return [student.display_name, student.email, ...stepCells, doneCount, `${pct}%`];
     });
 
+    const sanitizeCell = (value: unknown): string => {
+      let str = String(value || '').replace(/"/g, '""');
+      // Prevent spreadsheet formula injection
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`;
+      }
+      return `"${str}"`;
+    };
+
     const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+      .map(row => row.map(cell => sanitizeCell(cell)).join(','))
       .join('\n');
 
     const termName = termId
@@ -1178,7 +1198,7 @@ router.get('/analytics/students', async (req: Request, res: Response, next: Next
         break;
       }
       default:
-        return res.status(400).json({ error: `Unknown filter_type: ${filterType}` });
+        return res.status(400).json({ error: 'Invalid filter_type' });
     }
 
     const [studentsResult, totalResult] = await Promise.all([
@@ -1569,7 +1589,7 @@ router.post('/users', requireRole('sysadmin'), async (req: Request, res: Respons
 router.put('/users/:id', requireRole('sysadmin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const user = await req.db.queryOne<AdminUser>('SELECT * FROM admin_users WHERE id = $1', [id]);
+    const user = await req.db.queryOne<AdminUser>('SELECT id, email, role, display_name, is_active, azure_id, created_at FROM admin_users WHERE id = $1', [id]);
     if (!user) {
       return res.status(404).json({ error: 'Admin user not found' });
     }
@@ -1584,6 +1604,16 @@ router.put('/users/:id', requireRole('sysadmin'), async (req: Request, res: Resp
       if (!validRoles.includes(role)) {
         return res.status(400).json({ error: `role must be one of: ${validRoles.join(', ')}` });
       }
+      // Prevent demoting the last active sysadmin
+      if (role !== 'sysadmin' && user.role === 'sysadmin') {
+        const sysadminCount = await req.db.queryOne<{ count: string }>(
+          'SELECT COUNT(*) as count FROM admin_users WHERE role = $1 AND is_active = 1 AND id != $2',
+          ['sysadmin', id]
+        );
+        if (parseInt(sysadminCount!.count) === 0) {
+          return res.status(409).json({ error: 'Cannot demote the last active sysadmin' });
+        }
+      }
       updates.push(`role = ${p.next()}`);
       values.push(role);
     }
@@ -1592,6 +1622,20 @@ router.put('/users/:id', requireRole('sysadmin'), async (req: Request, res: Resp
       values.push(displayName);
     }
     if (is_active !== undefined) {
+      // Prevent self-deactivation
+      if (!is_active && id === req.adminUser!.id) {
+        return res.status(409).json({ error: 'Cannot deactivate your own account' });
+      }
+      // Prevent deactivating the last active sysadmin
+      if (!is_active && user.role === 'sysadmin') {
+        const sysadminCount = await req.db.queryOne<{ count: string }>(
+          'SELECT COUNT(*) as count FROM admin_users WHERE role = $1 AND is_active = 1 AND id != $2',
+          ['sysadmin', id]
+        );
+        if (parseInt(sysadminCount!.count) === 0) {
+          return res.status(409).json({ error: 'Cannot deactivate the last active sysadmin' });
+        }
+      }
       updates.push(`is_active = ${p.next()}`);
       values.push(is_active ? 1 : 0);
     }

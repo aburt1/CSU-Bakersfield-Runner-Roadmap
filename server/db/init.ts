@@ -182,7 +182,8 @@ export async function initDatabase(): Promise<Db> {
     const email = process.env.ADMIN_DEFAULT_EMAIL || 'admin@csub.edu';
     const password = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
     if (!process.env.ADMIN_DEFAULT_PASSWORD && process.env.NODE_ENV === 'production') {
-      console.warn('[db-init] WARNING: Using default admin password in production. Set ADMIN_DEFAULT_PASSWORD env var.');
+      console.error('[db-init] FATAL: ADMIN_DEFAULT_PASSWORD must be set in production. Refusing to seed default credentials.');
+      throw new Error('ADMIN_DEFAULT_PASSWORD is required in production');
     }
     const hash = await bcrypt.hash(password, 10);
     await db.execute(

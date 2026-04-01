@@ -35,21 +35,21 @@ router.post('/run-api-checks', async (req: Request, res: Response) => {
     }
 
     // Guard against concurrent runs for the same student
-    const currentRun = getRunState(student.email);
+    const currentRun = getRunState(student.id);
     if (currentRun.status === 'running') {
       return res.json({ status: 'started' });
     }
 
     // Start background check run
-    setRunState(student.email, { status: 'running', checkedSteps: [], startedAt: Date.now() });
+    setRunState(student.id, { status: 'running', checkedSteps: [], startedAt: Date.now() });
 
     runApiChecksForStudent(req.db, student)
       .then(result => {
-        setRunState(student.email, { status: 'complete', checkedSteps: result.checkedSteps, startedAt: Date.now() });
+        setRunState(student.id, { status: 'complete', checkedSteps: result.checkedSteps, startedAt: Date.now() });
       })
       .catch(err => {
         console.error('[api-check-runner]', err);
-        setRunState(student.email, { status: 'complete', checkedSteps: [], startedAt: Date.now() });
+        setRunState(student.id, { status: 'complete', checkedSteps: [], startedAt: Date.now() });
       });
 
     res.json({ status: 'started' });
@@ -62,16 +62,7 @@ router.post('/run-api-checks', async (req: Request, res: Response) => {
 // GET /api/roadmap/check-status
 router.get('/check-status', async (req: Request, res: Response) => {
   try {
-    const student = await req.db.queryOne<{ email: string }>(
-      'SELECT email FROM students WHERE id = $1',
-      [req.studentId]
-    );
-
-    if (!student) {
-      return res.status(404).json({ error: 'Student not found' });
-    }
-
-    const state = getRunState(student.email);
+    const state = getRunState(req.studentId!);
     res.json({ status: state.status, checkedSteps: state.checkedSteps });
   } catch (err) {
     console.error('[check-status]', err);

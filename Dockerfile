@@ -22,6 +22,9 @@ COPY --from=build /app/client/dist/ ./client/dist/
 
 RUN cd server && npm ci
 
+# Run as non-root user
+USER node
+
 EXPOSE 3001
 
 # Seed demo data on first start (idempotent — ON CONFLICT DO NOTHING), then start server

@@ -35,18 +35,18 @@ interface TestResult {
   wouldMarkComplete?: boolean;
 }
 
-// In-memory run state — keyed by student email
+// In-memory run state — keyed by student ID
 const runStates = new Map<string, RunState>();
 
-export function getRunState(email: string): RunState {
-  return runStates.get(email) || { status: 'no_run', checkedSteps: [] };
+export function getRunState(studentId: string): RunState {
+  return runStates.get(studentId) || { status: 'no_run', checkedSteps: [] };
 }
 
-export function setRunState(email: string, state: RunState): void {
-  runStates.set(email, state);
+export function setRunState(studentId: string, state: RunState): void {
+  runStates.set(studentId, state);
   // Clean up after 2 minutes for completed runs, 5 minutes for running (safety net)
   const ttl = state.status === 'complete' ? 120_000 : 300_000;
-  setTimeout(() => runStates.delete(email), ttl);
+  setTimeout(() => runStates.delete(studentId), ttl);
 }
 
 /**

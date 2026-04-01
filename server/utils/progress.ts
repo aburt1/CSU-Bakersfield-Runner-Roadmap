@@ -94,7 +94,8 @@ export async function applyStudentProgressChange(db: Db, input: ProgressChangeIn
   }>(
     `SELECT student_id, step_id, completed_at, status, note, completed_by
      FROM student_progress
-     WHERE student_id = $1 AND step_id = $2`,
+     WHERE student_id = $1 AND step_id = $2
+     FOR UPDATE`,
     [studentId, stepId]
   );
 

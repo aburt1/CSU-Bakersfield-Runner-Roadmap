@@ -1,8 +1,13 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import type { AdminRole } from '../types/models.js';
 
-const JWT_SECRET: string = process.env.JWT_SECRET || 'change-this-to-a-secure-random-string';
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set. Server cannot start.');
+  process.exit(1);
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 
 interface AdminJwtPayload {
   adminId: number;
@@ -21,8 +26,8 @@ export function adminAuth(req: Request, res: Response, next: NextFunction): void
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as AdminJwtPayload;
-      if (payload.adminId) {
+      const payload = jwt.verify(token, JWT_SECRET) as AdminJwtPayload & { type?: string };
+      if (payload.type === 'admin' && payload.adminId) {
         req.adminUser = {
           id: payload.adminId,
           role: payload.role,
@@ -39,8 +44,11 @@ export function adminAuth(req: Request, res: Response, next: NextFunction): void
 
   // Fallback: legacy API key (treated as superadmin)
   const apiKey = req.headers['x-api-key'];
-  if (apiKey) {
-    if (apiKey !== process.env.ADMIN_API_KEY) {
+  if (apiKey && process.env.ADMIN_API_KEY) {
+    const key = crypto.randomBytes(32);
+    const hmacA = crypto.createHmac('sha256', key).update(String(apiKey)).digest();
+    const hmacB = crypto.createHmac('sha256', key).update(process.env.ADMIN_API_KEY).digest();
+    if (!crypto.timingSafeEqual(hmacA, hmacB)) {
       res.status(403).json({ error: 'Invalid API key' });
       return;
     }

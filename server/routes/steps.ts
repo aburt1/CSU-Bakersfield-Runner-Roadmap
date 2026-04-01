@@ -8,14 +8,19 @@ import { getMergedTags } from '../utils/studentTags.js';
 import type { Step, Student } from '../types/models.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-to-a-secure-random-string';
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set. Server cannot start.');
+  process.exit(1);
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 
 function getOptionalStudentId(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 
   try {
-    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { studentId?: string };
+    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { type?: string; studentId?: string };
+    if (payload.type !== 'student') return null;
     return payload.studentId || null;
   } catch {
     return null;

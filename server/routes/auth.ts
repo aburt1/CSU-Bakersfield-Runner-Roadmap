@@ -9,7 +9,7 @@ const router = Router();
 // Accepts { name, email } and returns a JWT token
 router.post('/dev-login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== 'true') {
+    if (process.env.NODE_ENV === 'production') {
       return res.status(404).json({ error: 'Not found' });
     }
 

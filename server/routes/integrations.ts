@@ -252,6 +252,9 @@ router.post('/step-completions/batch', async (req: Request, res: Response, next:
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items must be a non-empty array' });
     }
+    if (items.length > 500) {
+      return res.status(400).json({ error: 'Batch size must not exceed 500 items' });
+    }
 
     const results: Record<string, unknown>[] = [];
     for (const item of items) {
