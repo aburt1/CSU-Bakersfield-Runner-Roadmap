@@ -11,7 +11,7 @@ import type { Db } from './types/db.js';
 import { zodErrorHandler } from './middleware/zodError.js';
 import stepsRouter from './routes/steps.js';
 import authRouter from './routes/auth.js';
-import adminRouter from './routes/admin.js';
+import adminRouter from './routes/admin/index.js';
 import adminAuthRouter from './routes/adminAuth.js';
 import integrationsRouter from './routes/integrations.js';
 import studentApiChecksRouter from './routes/studentApiChecks.js';

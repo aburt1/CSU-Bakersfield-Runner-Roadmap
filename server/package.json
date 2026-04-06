@@ -6,6 +6,10 @@
     "dev": "tsx watch dev.ts",
     "start": "tsx index.ts",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/integration",
+    "test:unit": "vitest run tests/unit",
     "import:fall-2026-checklist": "tsx scripts/importFall2026Checklist.js"
   },
   "dependencies": {
@@ -29,8 +33,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
     "@types/uuid": "^10.0.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   }
 }
