@@ -100,32 +100,8 @@ On first run, the database seeds:
 | `npm start` | Start production server |
 | `npm run install:all` | Install all dependencies |
 | `npm run import:fall-2026-checklist` | Import/update Fall 2026 checklist steps |
+| `npm test` | Run all tests (server + client) |
+| `npm run test:server` | Server tests only |
+| `npm run test:client` | Client tests only |
 
-## Project Structure
-
-```
-CSUB-admissions/
-├── client/                # React SPA (Vite + Tailwind)
-│   ├── src/
-│   │   ├── auth/          # AuthProvider context
-│   │   ├── components/    # Shared UI components
-│   │   ├── hooks/         # Custom hooks
-│   │   └── pages/         # RoadmapPage + admin dashboard
-│   └── vite.config.js     # Dev proxy to :3001
-│
-├── server/                # Express API
-│   ├── db/                # Schema, migrations, seed data
-│   ├── middleware/         # Auth middleware (student, admin, integration)
-│   ├── routes/            # API route handlers
-│   ├── utils/             # Shared utilities
-│   └── index.ts           # Entry point
-│
-├── docs/                  # Documentation
-│   ├── API-GUIDE.md       # Integration API reference
-│   ├── AUTH-ROADMAP.md    # Authentication roadmap
-│   └── screenshots/       # App screenshots
-│
-├── docker-compose.yml     # Docker services
-├── Dockerfile             # Container build
-└── package.json           # Root workspace scripts
-```
+For the full project structure, see [Architecture](ARCHITECTURE.md).
